@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # This script creates all three databases from scratch.
-# Run it once before starting the app for the first time.
 # It will DELETE existing databases and recreate them, so only run it when you
-# want a fresh start (start.sh protects you from running it by accident).
+# want a fresh start. `run_all.sh` only invokes it on first run when the
+# database files don't yet exist.
 
 import sqlite3  # Python's built-in library for working with SQLite databases
 import hashlib  # Used to hash (scramble) passwords before storing them

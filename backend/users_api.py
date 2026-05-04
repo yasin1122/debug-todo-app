@@ -21,8 +21,8 @@ DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 
 def hash_password(password):
-    # Convert a plain-text password into a SHA-256 hash.
-    # Example: "mypassword" → "89e495e7941cf9e40e6980d14a16bf023ccd4c91"
+    # Convert a plain-text password into a SHA-256 hash (64 hex chars).
+    # Example: "mypassword" → "89e01536ac207279409d4de1e5253e01f4a1769e696db0d6062ca9b8f56767c8"
     # We store the hash, never the original. When the user logs in we hash
     # what they typed and compare it to the stored hash.
     return hashlib.sha256(password.encode()).hexdigest()
