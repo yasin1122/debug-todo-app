@@ -1,27 +1,49 @@
 #!/usr/bin/env python3
-import sqlite3
-import json
-import http.client
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse
+# This is the Proxy — the single entry point for all API calls from the browser.
+# It runs on port 8080 and does two things:
+#
+#   1. Preferences: reads/writes preferences.db directly (no forwarding needed).
+#   2. Forwarding: passes /api/todos/* requests to the Todos API (port 8081)
+#                  and /api/auth/* requests to the Users API (port 8082).
+#
+# Having one entry point means the browser only needs to know one address,
+# and we can add auth checks, logging, or rate-limiting in one place.
+
+import sqlite3                              # Read/write preferences.db
+import json                                 # Convert Python dicts to/from JSON text
+import http.client                          # Make HTTP requests to the backend services
+from http.server import HTTPServer, BaseHTTPRequestHandler  # Python's built-in web server
+from urllib.parse import urlparse           # Break a URL into path, query, etc.
 
 import os
+
+# Absolute path to preferences.db — works regardless of launch directory.
 PREFERENCES_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'preferences.db')
+
+# Addresses of the two backend services we forward requests to.
 TODOS_API = 'localhost:8081'
 USERS_API = 'localhost:8082'
 
+
 class ProxyHandler(BaseHTTPRequestHandler):
+    # Handles every incoming HTTP request on port 8080.
+
     def do_OPTIONS(self):
+        # Respond to browser preflight checks (required for cross-origin requests).
         self.send_response(200)
         self.send_cors_headers()
         self.end_headers()
 
     def send_cors_headers(self):
+        # Allow the frontend (port 8000) to call this proxy (port 8080).
+        # X-User-Id is a custom header we use to pass the logged-in user's ID,
+        # so it needs to be explicitly listed here.
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-User-Id')
 
     def send_json_response(self, data, status=200):
+        # Helper that writes a complete JSON HTTP response.
         self.send_response(status)
         self.send_cors_headers()
         self.send_header('Content-Type', 'application/json')
@@ -29,11 +51,17 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
 
     def get_user_id_from_headers(self):
+        # The browser includes X-User-Id on every authenticated request.
+        # The value comes from localStorage where it was saved at login.
         return self.headers.get('X-User-Id')
 
     def proxy_request(self, target_host, method, path, headers=None, body=None):
+        # Open a connection to one of the backend services and forward the request.
+        # This is a server-to-server call — it never goes through the browser.
         conn = http.client.HTTPConnection(target_host)
 
+        # Copy the incoming headers to forward, but strip hop-by-hop headers
+        # (host/connection) that shouldn't be forwarded as-is.
         proxy_headers = {}
         if headers:
             for key, value in headers.items():
@@ -47,12 +75,19 @@ class ProxyHandler(BaseHTTPRequestHandler):
             conn.close()
             return response.status, response_data.decode()
         except Exception as e:
+            # If the backend service is down or unreachable, return a 500 error.
             conn.close()
             return 500, json.dumps({'error': str(e)})
 
+    # -------------------------------------------------------------------------
+    # Route incoming GET requests to the right handler.
+    # -------------------------------------------------------------------------
     def do_GET(self):
         parsed = urlparse(self.path)
         path_parts = parsed.path.split('/')
+        # e.g. "/preferences"     → ['', 'preferences']
+        # e.g. "/api/todos"       → ['', 'api', 'todos']
+        # e.g. "/api/todos/7"     → ['', 'api', 'todos', '7']
 
         if len(path_parts) >= 2 and path_parts[1] == 'preferences':
             self.handle_get_preferences()
@@ -64,6 +99,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
+    # -------------------------------------------------------------------------
+    # Route incoming POST requests.
+    # -------------------------------------------------------------------------
     def do_POST(self):
         parsed = urlparse(self.path)
         path_parts = parsed.path.split('/')
@@ -80,6 +118,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
+    # -------------------------------------------------------------------------
+    # Route incoming PUT requests (used for editing and toggling todos).
+    # -------------------------------------------------------------------------
     def do_PUT(self):
         parsed = urlparse(self.path)
         path_parts = parsed.path.split('/')
@@ -91,6 +132,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
+    # -------------------------------------------------------------------------
+    # Route incoming DELETE requests.
+    # -------------------------------------------------------------------------
     def do_DELETE(self):
         parsed = urlparse(self.path)
         path_parts = parsed.path.split('/')
@@ -100,6 +144,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
+    # -------------------------------------------------------------------------
+    # Preferences — handled directly here, no forwarding.
+    # -------------------------------------------------------------------------
     def handle_get_preferences(self):
         user_id = self.get_user_id_from_headers()
         if not user_id:
@@ -107,17 +154,20 @@ class ProxyHandler(BaseHTTPRequestHandler):
             return
 
         conn = sqlite3.connect(PREFERENCES_DB)
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row  # Access columns by name
         cursor = conn.cursor()
 
+        # Fetch the user's preferences (theme, sort settings, etc.)
         cursor.execute('SELECT * FROM user_preferences WHERE user_id = ?', (user_id,))
         prefs = cursor.fetchone()
 
+        # Fetch the user's table settings (which columns to show)
         cursor.execute('SELECT * FROM table_settings WHERE user_id = ?', (user_id,))
         settings = cursor.fetchone()
 
         conn.close()
 
+        # If the user has no saved preferences yet, return sensible defaults.
         response = {
             'preferences': dict(prefs) if prefs else self.get_default_preferences(),
             'table_settings': dict(settings) if settings else self.get_default_table_settings()
@@ -138,12 +188,16 @@ class ProxyHandler(BaseHTTPRequestHandler):
         conn = sqlite3.connect(PREFERENCES_DB)
         cursor = conn.cursor()
 
+        # The request body may contain "preferences", "table_settings", or both.
         if 'preferences' in data:
             prefs = data['preferences']
+
+            # Check whether a row already exists for this user.
             cursor.execute('SELECT user_id FROM user_preferences WHERE user_id = ?', (user_id,))
             exists = cursor.fetchone()
 
             if exists:
+                # Row exists — UPDATE only the fields that were sent.
                 update_fields = []
                 params = []
                 for field in ['theme', 'sort_by', 'sort_order', 'filter_status', 'show_completed', 'items_per_page']:
@@ -158,6 +212,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                         WHERE user_id = ?
                     ''', params)
             else:
+                # No row yet — INSERT a new one with defaults for missing fields.
                 cursor.execute('''
                     INSERT INTO user_preferences (user_id, theme, sort_by, sort_order, filter_status, show_completed, items_per_page)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -173,6 +228,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         if 'table_settings' in data:
             settings = data['table_settings']
+
             cursor.execute('SELECT user_id FROM table_settings WHERE user_id = ?', (user_id,))
             exists = cursor.fetchone()
 
@@ -182,6 +238,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 for field in ['visible_columns', 'column_widths', 'last_filter']:
                     if field in settings:
                         update_fields.append(f'{field} = ?')
+                        # Lists and dicts must be serialised to a JSON string
+                        # because SQLite only stores text, numbers, or blobs.
                         value = json.dumps(settings[field]) if isinstance(settings[field], (list, dict)) else settings[field]
                         params.append(value)
 
@@ -208,6 +266,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.send_json_response({'message': 'Preferences updated successfully'})
 
     def get_default_preferences(self):
+        # Returned when a user has never saved preferences before.
         return {
             'theme': 'light',
             'sort_by': 'created_at',
@@ -218,20 +277,27 @@ class ProxyHandler(BaseHTTPRequestHandler):
         }
 
     def get_default_table_settings(self):
+        # All columns visible by default for a new user.
         return {
             'visible_columns': ["title", "priority", "due_date", "completed", "actions"],
             'column_widths': {},
             'last_filter': None
         }
 
+    # -------------------------------------------------------------------------
+    # Forwarding helpers — read the request body, pass it on, relay the response.
+    # -------------------------------------------------------------------------
     def proxy_to_todos(self, method):
+        # Read the request body if there is one (POST/PUT have bodies; GET/DELETE don't).
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
 
+        # Forward the original path unchanged (e.g. /api/todos/5/complete).
         path = self.path
         headers = dict(self.headers.items())
         status, response = self.proxy_request(TODOS_API, method, path, headers, body)
 
+        # Relay the backend's response back to the browser.
         self.send_response(status)
         self.send_cors_headers()
         self.send_header('Content-Type', 'application/json')
@@ -239,6 +305,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.wfile.write(response.encode())
 
     def proxy_to_users(self, method):
+        # Same pattern as proxy_to_todos, but forwards to the Users API instead.
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
 
@@ -252,11 +319,13 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(response.encode())
 
+
 def run_server(port=8080):
     server_address = ('', port)
     httpd = HTTPServer(server_address, ProxyHandler)
     print(f'Proxy server running on port {port}...')
     httpd.serve_forever()
+
 
 if __name__ == '__main__':
     run_server()

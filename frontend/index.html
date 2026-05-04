@@ -1,34 +1,66 @@
 <!DOCTYPE html>
+<!-- DOCTYPE tells the browser this is a modern HTML5 document. -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!-- charset="UTF-8" lets the page display any character, including emoji. -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- The viewport meta tag makes the page scale correctly on mobile screens. -->
+
     <title>Debug Todo App</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Load our CSS file. This must come before the body so styles are ready
+         before the browser paints anything visible. -->
 </head>
+
+<!-- class="light-theme" is the default. app.js changes this to "dark-theme"
+     if the user has dark mode saved in their preferences. -->
 <body class="light-theme">
+
     <div id="app">
+
+        <!-- ================================================================
+             HEADER — fixed bar at the top with the app title and controls
+             ================================================================ -->
         <header class="app-header">
             <div class="header-content">
                 <h1>Todo Debug App</h1>
+
                 <div class="header-controls">
+                    <!-- app.js fills this in with "👤 username" after login. -->
                     <span id="username-display"></span>
+
+                    <!-- Clicking this button toggles between 🌙 and ☀️ and
+                         switches the body class between light-theme/dark-theme. -->
                     <button id="theme-toggle" class="icon-btn" title="Toggle theme">🌙</button>
+
                     <button id="logout-btn" class="btn btn-secondary">Logout</button>
                 </div>
             </div>
         </header>
 
+        <!-- ================================================================
+             MAIN CONTENT — the toolbar and the todos table
+             ================================================================ -->
         <main class="app-main">
+
+            <!-- The toolbar holds all the controls above the table. -->
             <div class="toolbar">
+
+                <!-- Left side: action buttons -->
                 <div class="toolbar-left">
                     <button id="add-todo-btn" class="btn btn-primary">+ Add Todo</button>
                     <button id="refresh-btn" class="btn btn-secondary">🔄 Refresh</button>
                 </div>
 
+                <!-- Centre: filter, sort, and pagination dropdowns -->
                 <div class="toolbar-center">
+
                     <div class="filter-group">
                         <label for="filter-status">Filter:</label>
+                        <!-- Changing this dropdown triggers a new fetch with the
+                             selected status filter applied server-side. -->
                         <select id="filter-status">
                             <option value="all">All</option>
                             <option value="active">Active</option>
@@ -39,6 +71,8 @@
 
                     <div class="sort-group">
                         <label for="sort-by">Sort by:</label>
+                        <!-- sort-by and sort-order are also sent to the server
+                             as query parameters so sorting happens in the DB. -->
                         <select id="sort-by">
                             <option value="created_at">Date Created</option>
                             <option value="title">Title</option>
@@ -53,57 +87,86 @@
 
                     <div class="pagination-group">
                         <label for="items-per-page">Items:</label>
+                        <!-- This controls how many rows appear per page. The
+                             slicing happens in renderTodos() in app.js. -->
                         <select id="items-per-page">
                             <option value="5">5</option>
                             <option value="10">10</option>
                             <option value="20">20</option>
                         </select>
                     </div>
+
                 </div>
 
+                <!-- Right side: column visibility settings -->
                 <div class="toolbar-right">
                     <button id="column-settings-btn" class="btn btn-secondary">⚙️ Columns</button>
                 </div>
-            </div>
 
+            </div><!-- end .toolbar -->
+
+            <!-- The table container enables horizontal scrolling on small screens. -->
             <div class="todos-container">
                 <table id="todos-table" class="todos-table">
                     <thead>
                         <tr>
+                            <!-- data-column matches the column name used in app.js to
+                                 show/hide columns and apply sort indicators.
+                                 class="sortable" makes the header clickable for sorting. -->
                             <th data-column="title" class="sortable">Title</th>
                             <th data-column="priority" class="sortable">Priority</th>
                             <th data-column="due_date" class="sortable">Due Date</th>
+                            <!-- The completed column is not sortable — clicking it would
+                                 be confusing since you toggle completion per row. -->
                             <th data-column="completed">✓</th>
                             <th data-column="actions">Actions</th>
                         </tr>
                     </thead>
+                    <!-- app.js fills this <tbody> with <tr> elements via innerHTML. -->
                     <tbody id="todos-tbody">
                     </tbody>
                 </table>
 
+                <!-- Shown when there are no todos to display. Hidden otherwise. -->
                 <div id="empty-state" class="empty-state" style="display: none;">
                     <p>No todos yet. Click "Add Todo" to create your first task!</p>
                 </div>
             </div>
 
+            <!-- Page navigation — disabled state is managed by updatePagination() in app.js. -->
             <div class="pagination">
                 <button id="prev-page" class="btn btn-secondary" disabled>← Previous</button>
                 <span id="page-info">Page 1 of 1</span>
                 <button id="next-page" class="btn btn-secondary" disabled>Next →</button>
             </div>
-        </main>
-    </div>
 
+        </main>
+    </div><!-- end #app -->
+
+
+    <!-- ====================================================================
+         ADD / EDIT TODO MODAL
+         style="display: none" keeps it invisible until showModal() is called.
+         ==================================================================== -->
     <div id="todo-modal" class="modal" style="display: none;">
         <div class="modal-content">
+
             <div class="modal-header">
+                <!-- app.js changes this text between "Add Todo" and "Edit Todo" -->
                 <h2 id="modal-title">Add Todo</h2>
+                <!-- × button — app.js listens on .modal-close to close the modal -->
                 <button class="modal-close">&times;</button>
             </div>
+
             <div class="modal-body">
+                <!-- form id is referenced by the Save button's form="todo-form" attribute
+                     so clicking Save outside the form still submits it. -->
                 <form id="todo-form">
+
                     <div class="form-group">
                         <label for="todo-title">Title *</label>
+                        <!-- required means the browser won't submit the form
+                             without a value in this field. -->
                         <input type="text" id="todo-title" required>
                     </div>
 
@@ -112,6 +175,7 @@
                         <textarea id="todo-description" rows="3"></textarea>
                     </div>
 
+                    <!-- form-row uses CSS grid to place Priority and Due Date side by side. -->
                     <div class="form-row">
                         <div class="form-group">
                             <label for="todo-priority">Priority</label>
@@ -124,41 +188,61 @@
 
                         <div class="form-group">
                             <label for="todo-due-date">Due Date</label>
+                            <!-- datetime-local shows a date+time picker in the browser. -->
                             <input type="datetime-local" id="todo-due-date">
                         </div>
                     </div>
 
                 </form>
             </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                <!-- form="todo-form" links this button to the form above, so clicking
+                     it submits the form even though it's outside the <form> tags. -->
                 <button type="submit" form="todo-form" class="btn btn-primary">Save</button>
             </div>
-        </div>
-    </div>
 
+        </div>
+    </div><!-- end #todo-modal -->
+
+
+    <!-- ====================================================================
+         COLUMN SETTINGS MODAL
+         Lets the user show or hide individual table columns.
+         ==================================================================== -->
     <div id="column-settings-modal" class="modal" style="display: none;">
         <div class="modal-content modal-small">
+
             <div class="modal-header">
                 <h2>Column Settings</h2>
                 <button class="modal-close">&times;</button>
             </div>
+
             <div class="modal-body">
                 <div class="column-settings">
+                    <!-- data-column must match the data-column values on the
+                         table headers and cells so app.js can link them together. -->
                     <label><input type="checkbox" data-column="title" checked> Title</label>
                     <label><input type="checkbox" data-column="priority" checked> Priority</label>
                     <label><input type="checkbox" data-column="due_date" checked> Due Date</label>
                     <label><input type="checkbox" data-column="completed" checked> Completed</label>
+                    <!-- Actions is always shown (disabled checkbox) because without
+                         it you'd have no way to edit or delete todos. -->
                     <label><input type="checkbox" data-column="actions" checked disabled> Actions</label>
                 </div>
             </div>
+
             <div class="modal-footer">
                 <button class="btn btn-secondary modal-cancel">Cancel</button>
                 <button class="btn btn-primary" id="save-column-settings">Save</button>
             </div>
-        </div>
-    </div>
 
+        </div>
+    </div><!-- end #column-settings-modal -->
+
+    <!-- Load the JavaScript last so all the HTML elements above exist in the DOM
+         before app.js tries to find them with getElementById etc. -->
     <script src="app.js"></script>
 </body>
 </html>
