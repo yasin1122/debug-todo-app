@@ -162,17 +162,62 @@ We'll throw it away in the next phase and use CSS instead.
 ## Phase 2 · Make it look like a real app (CSS)
 
 **Goal:** the page should look halfway decent — proper fonts, spacing, a
-clean table.
+clean table. We'll keep the styles in **their own file**, separate from the
+HTML, from day one.
 
 **Concepts:**
 - CSS selectors
 - The browser's default styles
 - The cascade
+- Why we put styles in a separate file (separation of concerns)
 
-### Step 2.1 — Add a `<style>` block
+### Step 2.1 — Create `style.css`
 
-Replace your `index.html` with this version. The new bits are between
-`<style>` and `</style>` in the `<head>`.
+Make a new file called `style.css` in the same folder as `index.html`,
+with this content:
+
+```css
+body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    max-width: 700px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    color: #222;
+    background: #f6f6f6;
+}
+
+h1 {
+    margin-bottom: 1.5rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+th, td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background: #fafafa;
+    font-weight: 600;
+}
+
+tr:hover {
+    background: #f0f8ff;
+}
+```
+
+### Step 2.2 — Tell `index.html` about the stylesheet
+
+Replace your `index.html` with this version. The only difference is the
+new `<link>` line in the `<head>` — and we dropped the `border="1"`
+because CSS is doing that job now.
 
 ```html
 <!DOCTYPE html>
@@ -180,42 +225,7 @@ Replace your `index.html` with this version. The new bits are between
 <head>
     <meta charset="UTF-8">
     <title>My Todos</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            max-width: 700px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            color: #222;
-            background: #f6f6f6;
-        }
-
-        h1 {
-            margin-bottom: 1.5rem;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-
-        th, td {
-            padding: 0.75rem 1rem;
-            text-align: left;
-            border-bottom: 1px solid #eee;
-        }
-
-        th {
-            background: #fafafa;
-            font-weight: 600;
-        }
-
-        tr:hover {
-            background: #f0f8ff;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1>My Todos</h1>
@@ -238,12 +248,10 @@ Replace your `index.html` with this version. The new bits are between
 </html>
 ```
 
-We dropped the `border="1"` because the CSS is doing that job now.
+### Step 2.3 — Reload the browser
 
-### Step 2.2 — Reload the browser
-
-Save the file and refresh the tab. The table should look much nicer — soft
-shadows, a hover effect, proper padding.
+Save both files and refresh the tab. The table should look much nicer —
+soft shadows, a hover effect, proper padding.
 
 ### Concept break: what is CSS?
 
@@ -267,27 +275,125 @@ selector {
 "Cascading" means rules can override each other. A more specific rule wins
 (e.g., `body table th` beats plain `th`).
 
+### Concept break: why a separate file?
+
+You **could** put all this CSS inside a `<style>` block in `index.html`,
+and the browser would render it identically. But three reasons to split:
+
+1. **Separation of concerns.** Each file does one job — `index.html` is
+   structure, `style.css` is appearance. When the page misbehaves, you
+   know which file to look at.
+2. **Reuse.** When we add a `login.html` later, it can `<link>` the
+   same stylesheet and inherit the look for free.
+3. **Browser caching.** The browser fetches `style.css` once and reuses
+   it across pages. Inline styles are re-downloaded with every page.
+
+`<link rel="stylesheet" href="style.css">` is the magic line. The browser
+sees it, fetches the file from the same folder, and applies the rules.
+
 ### What you just learned
 
-- CSS lives between `<style>` tags or in a separate `.css` file.
+- CSS lives in a `.css` file that HTML loads with `<link>`.
 - Selectors target elements; properties change how they look.
 - A bit of styling goes a long way — same HTML, totally different vibe.
+- Splitting structure (HTML) from style (CSS) is a habit you build
+  from day one.
 
 ---
 
 ## Phase 3 · Make it interactive (JavaScript)
 
 **Goal:** add new todos by typing and clicking. Toggle done. Delete a todo.
+The JavaScript lives in **its own file** (`app.js`), separate from the HTML.
 
 **Concepts:**
 - JavaScript variables and arrays
 - The DOM (Document Object Model)
 - Event listeners
 - Re-rendering
+- Loading external scripts with `<script src="…">`
 
-### Step 3.1 — Replace the static rows with JavaScript
+### Step 3.1 — Add a few new styles to `style.css`
 
-Replace `index.html` with this:
+Append these rules to your existing `style.css` (don't replace the file —
+just add to the end):
+
+```css
+.add-row {
+    margin-bottom: 1rem;
+    display: flex;
+    gap: 0.5rem;
+}
+.add-row input { flex: 1; padding: 0.5rem; }
+.add-row button { padding: 0.5rem 1rem; }
+.done td { color: #999; text-decoration: line-through; }
+button { cursor: pointer; }
+```
+
+### Step 3.2 — Create `app.js`
+
+Make a new file called `app.js` next to `index.html`, with this content:
+
+```javascript
+// The whole list of todos lives in this array.
+// Every time we change it, we re-render the table.
+let todos = [
+    { id: 1, title: 'Buy groceries', done: false },
+    { id: 2, title: 'Walk the dog',  done: true  }
+];
+
+// Build one <tr> per todo and shove them into the <tbody>.
+function render() {
+    const tbody = document.getElementById('todos-tbody');
+    tbody.innerHTML = todos.map(t => `
+        <tr class="${t.done ? 'done' : ''}">
+            <td>${t.title}</td>
+            <td>${t.done ? '✓' : '○'}</td>
+            <td>
+                <button onclick="toggleDone(${t.id})">Toggle</button>
+                <button onclick="deleteTodo(${t.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function addTodo() {
+    const input = document.getElementById('new-todo');
+    const title = input.value.trim();
+    if (!title) return;                        // ignore empty input
+    const id = Date.now();                     // quick & dirty unique id
+    todos.push({ id, title, done: false });
+    input.value = '';
+    render();
+}
+
+function toggleDone(id) {
+    const t = todos.find(t => t.id === id);
+    if (t) t.done = !t.done;
+    render();
+}
+
+function deleteTodo(id) {
+    todos = todos.filter(t => t.id !== id);
+    render();
+}
+
+// Wire the Add button up to the addTodo function.
+document.getElementById('add-btn').addEventListener('click', addTodo);
+// Also handle Enter inside the input box.
+document.getElementById('new-todo').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTodo();
+});
+
+// First paint.
+render();
+```
+
+### Step 3.3 — Update `index.html` to add the input row and load `app.js`
+
+Replace `index.html` with this. Two new things: the `<div class="add-row">`
+above the table, and the `<script src="app.js"></script>` at the bottom of
+the body.
 
 ```html
 <!DOCTYPE html>
@@ -295,28 +401,7 @@ Replace `index.html` with this:
 <head>
     <meta charset="UTF-8">
     <title>My Todos</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            max-width: 700px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            color: #222;
-            background: #f6f6f6;
-        }
-        h1 { margin-bottom: 1.5rem; }
-        .add-row { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
-        .add-row input { flex: 1; padding: 0.5rem; }
-        .add-row button { padding: 0.5rem 1rem; }
-        table { width: 100%; border-collapse: collapse; background: white;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        th, td { padding: 0.75rem 1rem; text-align: left;
-                 border-bottom: 1px solid #eee; }
-        th { background: #fafafa; font-weight: 600; }
-        tr:hover { background: #f0f8ff; }
-        .done td { color: #999; text-decoration: line-through; }
-        button { cursor: pointer; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <h1>My Todos</h1>
@@ -337,65 +422,13 @@ Replace `index.html` with this:
         <tbody id="todos-tbody"></tbody>
     </table>
 
-    <script>
-        // The whole list of todos lives in this array.
-        // Every time we change it, we re-render the table.
-        let todos = [
-            { id: 1, title: 'Buy groceries', done: false },
-            { id: 2, title: 'Walk the dog',  done: true  }
-        ];
-
-        // Build one <tr> per todo and shove them into the <tbody>.
-        function render() {
-            const tbody = document.getElementById('todos-tbody');
-            tbody.innerHTML = todos.map(t => `
-                <tr class="${t.done ? 'done' : ''}">
-                    <td>${t.title}</td>
-                    <td>${t.done ? '✓' : '○'}</td>
-                    <td>
-                        <button onclick="toggleDone(${t.id})">Toggle</button>
-                        <button onclick="deleteTodo(${t.id})">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function addTodo() {
-            const input = document.getElementById('new-todo');
-            const title = input.value.trim();
-            if (!title) return;                        // ignore empty input
-            const id = Date.now();                     // quick & dirty unique id
-            todos.push({ id, title, done: false });
-            input.value = '';
-            render();
-        }
-
-        function toggleDone(id) {
-            const t = todos.find(t => t.id === id);
-            if (t) t.done = !t.done;
-            render();
-        }
-
-        function deleteTodo(id) {
-            todos = todos.filter(t => t.id !== id);
-            render();
-        }
-
-        // Wire the Add button up to the addTodo function.
-        document.getElementById('add-btn').addEventListener('click', addTodo);
-        // Also handle Enter inside the input box.
-        document.getElementById('new-todo').addEventListener('keydown', e => {
-            if (e.key === 'Enter') addTodo();
-        });
-
-        // First paint.
-        render();
-    </script>
+    <!-- Load app.js LAST, after the elements it touches exist. -->
+    <script src="app.js"></script>
 </body>
 </html>
 ```
 
-### Step 3.2 — Reload and play
+### Step 3.4 — Reload and play
 
 Refresh. Try:
 - Typing "Drink water" and pressing Enter.
@@ -430,12 +463,31 @@ hovers, scrolls. Your code can listen for them with `addEventListener`.
 The `(e) => { ... }` style is an arrow function — a short way to write
 a function in JavaScript.
 
+### Concept break: why `<script>` at the bottom?
+
+The browser reads HTML top-to-bottom. If you put `<script>` in the
+`<head>`, it runs *before* the rest of the page exists, and lines like
+`document.getElementById('add-btn')` return `null` because the button
+hasn't been created yet.
+
+Two options solve this:
+
+1. Put the `<script>` tag at the **end of `<body>`** (what we did).
+2. Use `<script defer src="app.js">` in the `<head>` — `defer` tells the
+   browser "wait until the HTML is fully parsed, then run."
+
+Either works. Bottom-of-body is the easiest mental model: code runs when
+the page below it has already been built.
+
 ### What you just learned
 
-- A web page is HTML + CSS + JS, all loadable from one file.
+- HTML, CSS, and JavaScript each live in their own file. The HTML loads
+  the other two via `<link>` and `<script>`.
 - Storing data in a JavaScript array and re-rendering is a totally valid
   way to build a small app.
 - Events are how user actions talk to your code.
+- Scripts that touch elements need those elements to already exist —
+  hence `<script>` at the bottom of `<body>`.
 
 ---
 
@@ -458,7 +510,7 @@ a function in JavaScript.
 
 ### Step 4.1 — Add load/save helpers
 
-Find the JavaScript section in `index.html` and replace the line
+Open `app.js`. Replace the lines
 
 ```javascript
 let todos = [
@@ -630,64 +682,62 @@ if __name__ == '__main__':
     HTTPServer(('', 8000), Handler).serve_forever()
 ```
 
-### Step 5.2 — Update `index.html` to talk to the server
+### Step 5.2 — Update `app.js` to talk to the server
 
-The HTML and CSS stay the same. Only the `<script>` block changes — we
-remove the localStorage stuff and instead `fetch` from the server.
+The HTML and CSS stay the same. Only `app.js` changes — we remove the
+localStorage stuff and instead `fetch` from the server.
 
-Replace the entire `<script>` block in `index.html` with:
+Replace the entire contents of `app.js` with:
 
-```html
-<script>
-    // The list lives in memory only as a cache of what the server has.
-    // The "source of truth" is now the server.
-    let todos = [];
+```javascript
+// The list lives in memory only as a cache of what the server has.
+// The "source of truth" is now the server.
+let todos = [];
 
-    function render() {
-        const tbody = document.getElementById('todos-tbody');
-        tbody.innerHTML = todos.map(t => `
-            <tr class="${t.done ? 'done' : ''}">
-                <td>${t.title}</td>
-                <td>${t.done ? '✓' : '○'}</td>
-                <td>
-                    <button onclick="toggleDone(${t.id})">Toggle</button>
-                    <button onclick="deleteTodo(${t.id})">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-    }
+function render() {
+    const tbody = document.getElementById('todos-tbody');
+    tbody.innerHTML = todos.map(t => `
+        <tr class="${t.done ? 'done' : ''}">
+            <td>${t.title}</td>
+            <td>${t.done ? '✓' : '○'}</td>
+            <td>
+                <button onclick="toggleDone(${t.id})">Toggle</button>
+                <button onclick="deleteTodo(${t.id})">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
 
-    // Fetch the todo list from the server.
-    async function loadTodos() {
-        const response = await fetch('/api/todos');
-        todos = await response.json();
-        render();
-    }
+// Fetch the todo list from the server.
+async function loadTodos() {
+    const response = await fetch('/api/todos');
+    todos = await response.json();
+    render();
+}
 
-    async function addTodo() {
-        const input = document.getElementById('new-todo');
-        const title = input.value.trim();
-        if (!title) return;
-        await fetch('/api/todos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title })
-        });
-        input.value = '';
-        loadTodos();
-    }
-
-    // We'll wire up Toggle and Delete in Phase 7 once the server supports them.
-    function toggleDone(id) { alert('Coming in Phase 7!'); }
-    function deleteTodo(id) { alert('Coming in Phase 7!'); }
-
-    document.getElementById('add-btn').addEventListener('click', addTodo);
-    document.getElementById('new-todo').addEventListener('keydown', e => {
-        if (e.key === 'Enter') addTodo();
+async function addTodo() {
+    const input = document.getElementById('new-todo');
+    const title = input.value.trim();
+    if (!title) return;
+    await fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title })
     });
-
+    input.value = '';
     loadTodos();
-</script>
+}
+
+// We'll wire up Toggle and Delete in Phase 7 once the server supports them.
+function toggleDone(id) { alert('Coming in Phase 7!'); }
+function deleteTodo(id) { alert('Coming in Phase 7!'); }
+
+document.getElementById('add-btn').addEventListener('click', addTodo);
+document.getElementById('new-todo').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTodo();
+});
+
+loadTodos();
 ```
 
 ### Step 5.3 — Run the server
@@ -1101,10 +1151,10 @@ if __name__ == '__main__':
     HTTPServer(('', 8000), Handler).serve_forever()
 ```
 
-### Step 7.2 — Wire up the buttons in `index.html`
+### Step 7.2 — Wire up the buttons in `app.js`
 
-Replace the placeholder `toggleDone` and `deleteTodo` functions in your
-`<script>` block with real ones:
+Replace the placeholder `toggleDone` and `deleteTodo` functions in `app.js`
+with real ones:
 
 ```javascript
 async function toggleDone(id) {
@@ -1222,7 +1272,7 @@ Just above the table in `index.html`, add:
 </div>
 ```
 
-And in your `<script>`, replace `loadTodos` and add change listeners:
+And in `app.js`, replace `loadTodos` and add change listeners:
 
 ```javascript
 async function loadTodos() {
@@ -1417,25 +1467,64 @@ The full updated server is too long to repeat in one block — but the
 pattern is what matters: add the auth check, then add `AND user_id = ?`
 to every query.
 
-### Step 9.3 — Make a login page
+### Step 9.3 — Add login styles to `style.css`
 
-Create `login.html` next to `index.html`:
+Append a few new rules to `style.css`:
+
+```css
+.login-page {
+    max-width: 400px;
+    margin: 4rem auto;
+    text-align: center;
+}
+.login-page input {
+    display: block;
+    margin: 0.5rem auto;
+    padding: 0.5rem;
+    width: 100%;
+}
+.error { color: crimson; }
+```
+
+### Step 9.4 — Create `login.js` with the login logic
+
+Make a new file `login.js`:
+
+```javascript
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const r = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+    const data = await r.json();
+    if (r.ok) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('username', data.username);
+        window.location.href = 'index.html';
+    } else {
+        document.getElementById('error').textContent = data.error;
+    }
+});
+```
+
+### Step 9.5 — Create `login.html`
+
+Create `login.html` next to `index.html`. It reuses our existing
+`style.css` and loads our new `login.js`:
 
 ```html
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Login</title>
-    <style>
-        body { font-family: sans-serif; max-width: 400px; margin: 4rem auto;
-               text-align: center; }
-        input { display: block; margin: 0.5rem auto; padding: 0.5rem;
-                width: 100%; }
-        button { padding: 0.5rem 1rem; }
-        .error { color: crimson; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="login-page">
     <h1>Log in</h1>
     <form id="login-form">
         <input id="username" placeholder="Username" required>
@@ -1445,33 +1534,14 @@ Create `login.html` next to `index.html`:
     </form>
     <p>Try <code>alice / alice123</code> or <code>bob / bob123</code></p>
 
-    <script>
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const r = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-            const data = await r.json();
-            if (r.ok) {
-                localStorage.setItem('token', data.token);
-                localStorage.setItem('username', data.username);
-                window.location.href = 'index.html';
-            } else {
-                document.getElementById('error').textContent = data.error;
-            }
-        });
-    </script>
+    <script src="login.js"></script>
 </body>
 </html>
 ```
 
-### Step 9.4 — Update `index.html` to send the token
+### Step 9.6 — Update `app.js` to send the token
 
-At the top of your `<script>` block in index.html:
+At the top of `app.js`:
 
 ```javascript
 const token = localStorage.getItem('token');
@@ -1496,7 +1566,7 @@ await fetch('/api/todos', {
 });
 ```
 
-### Step 9.5 — Try it
+### Step 9.7 — Try it
 
 Restart the server, go to **http://localhost:8000/login.html**, log in as
 alice. You'll see Alice's todo. Log out (clear localStorage in DevTools or
@@ -1576,7 +1646,10 @@ Make this directory layout:
 my-todo-app/
 ├── frontend/
 │   ├── index.html
-│   └── login.html
+│   ├── login.html
+│   ├── app.js
+│   ├── login.js
+│   └── style.css
 ├── backend/
 │   ├── todos_api.py
 │   └── users_api.py
@@ -1586,9 +1659,9 @@ my-todo-app/
     └── users.db
 ```
 
-Move your existing `index.html` and `login.html` into `frontend/`. Move
-`init_db.py` into `database/`. Delete `server.py` — we'll write two new
-ones.
+Move every frontend file (`index.html`, `login.html`, `app.js`, `login.js`,
+`style.css`) into `frontend/`. Move `init_db.py` into `database/`. Delete
+`server.py` — we'll write two new ones.
 
 ### Step 10.2 — Split the database in two
 
@@ -1797,26 +1870,28 @@ cd frontend && python3 -m http.server 8000
 
 ### Step 10.6 — Update the frontend to talk to two backends
 
-In `frontend/login.html`, point at `:8082`:
+In `frontend/login.js`, change the fetch URL to point at `:8082`:
 
 ```javascript
 const r = await fetch('http://localhost:8082/api/login', { ... });
 ```
 
-In `frontend/index.html`, point at `:8081` for todos. Also: the login
-page now has to remember `user_id` (from the response) instead of just the
-token, because that's what `:8081` wants in the `X-User-Id` header.
+After a successful login, also remember the `user_id` (from the response) —
+the todos API at `:8081` wants it in the `X-User-Id` header:
 
 ```javascript
-// In login.html, after a successful login:
+// In login.js, after a successful login:
 localStorage.setItem('token', data.token);
 localStorage.setItem('user_id', data.user_id);
 localStorage.setItem('username', data.username);
 ```
 
+In `frontend/app.js`, point todo requests at `:8081` and send the user id:
+
 ```javascript
-// In index.html:
+// At the top of app.js:
 const userId = localStorage.getItem('user_id');
+
 // Every fetch:
 fetch('http://localhost:8081/api/todos', {
     headers: { 'X-User-Id': userId }
@@ -1962,8 +2037,8 @@ The proxy sends `/api/auth/login` to the users API. So change
 
 ### Step 11.3 — Update frontend URLs
 
-In both `login.html` and `index.html`, replace **all** the hardcoded URLs
-with one constant:
+In both `login.js` and `app.js`, replace **all** the hardcoded URLs with
+one constant at the top:
 
 ```javascript
 const API_URL = 'http://localhost:8080';
@@ -2126,7 +2201,9 @@ Add a button somewhere in the body:
 <button id="theme-toggle">🌙</button>
 ```
 
-In your script, add:
+### Step 12.4 — Wire up the toggle in `app.js`
+
+Append this to `app.js`:
 
 ```javascript
 async function loadPreferences() {
@@ -2150,7 +2227,9 @@ document.getElementById('theme-toggle').addEventListener('click', async () => {
 loadPreferences();
 ```
 
-And add CSS for the dark theme:
+### Step 12.5 — Add dark-theme rules to `style.css`
+
+Append to `style.css`:
 
 ```css
 .dark-theme { background: #1e1e1e; color: #ddd; }
@@ -2158,7 +2237,7 @@ And add CSS for the dark theme:
 .dark-theme th { background: #333; }
 ```
 
-### Step 12.4 — Try it
+### Step 12.6 — Try it
 
 Click the moon. The app goes dark. Refresh — still dark. Log in as
 another user — *their* theme. Each user has their own preference.
