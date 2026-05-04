@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Todo App</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light-theme">
+    <div id="app">
+        <header class="app-header">
+            <div class="header-content">
+                <h1>Todo Debug App</h1>
+                <div class="header-controls">
+                    <span id="username-display"></span>
+                    <button id="theme-toggle" class="icon-btn" title="Toggle theme">🌙</button>
+                    <button id="logout-btn" class="btn btn-secondary">Logout</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button id="add-todo-btn" class="btn btn-primary">+ Add Todo</button>
+                    <button id="refresh-btn" class="btn btn-secondary">🔄 Refresh</button>
+                </div>
+
+                <div class="toolbar-center">
+                    <div class="filter-group">
+                        <label for="filter-status">Filter:</label>
+                        <select id="filter-status">
+                            <option value="all">All</option>
+                            <option value="active">Active</option>
+                            <option value="completed">Completed</option>
+                            <option value="overdue">Overdue</option>
+                        </select>
+                    </div>
+
+                    <div class="sort-group">
+                        <label for="sort-by">Sort by:</label>
+                        <select id="sort-by">
+                            <option value="created_at">Date Created</option>
+                            <option value="title">Title</option>
+                            <option value="priority">Priority</option>
+                            <option value="due_date">Due Date</option>
+                        </select>
+                        <select id="sort-order">
+                            <option value="desc">↓</option>
+                            <option value="asc">↑</option>
+                        </select>
+                    </div>
+
+                    <div class="pagination-group">
+                        <label for="items-per-page">Items:</label>
+                        <select id="items-per-page">
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="toolbar-right">
+                    <button id="column-settings-btn" class="btn btn-secondary">⚙️ Columns</button>
+                </div>
+            </div>
+
+            <div class="todos-container">
+                <table id="todos-table" class="todos-table">
+                    <thead>
+                        <tr>
+                            <th data-column="title" class="sortable">Title</th>
+                            <th data-column="priority" class="sortable">Priority</th>
+                            <th data-column="due_date" class="sortable">Due Date</th>
+                            <th data-column="tags">Tags</th>
+                            <th data-column="completed" class="sortable">✓</th>
+                            <th data-column="actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="todos-tbody">
+                    </tbody>
+                </table>
+
+                <div id="empty-state" class="empty-state" style="display: none;">
+                    <p>No todos yet. Click "Add Todo" to create your first task!</p>
+                </div>
+            </div>
+
+            <div class="pagination">
+                <button id="prev-page" class="btn btn-secondary" disabled>← Previous</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page" class="btn btn-secondary" disabled>Next →</button>
+            </div>
+        </main>
+    </div>
+
+    <div id="todo-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Add Todo</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="todo-form">
+                    <div class="form-group">
+                        <label for="todo-title">Title *</label>
+                        <input type="text" id="todo-title" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="todo-description">Description</label>
+                        <textarea id="todo-description" rows="3"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="todo-priority">Priority</label>
+                            <select id="todo-priority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="todo-due-date">Due Date</label>
+                            <input type="datetime-local" id="todo-due-date">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="todo-tags">Tags</label>
+                        <div id="tags-container" class="tags-container">
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                <button type="submit" form="todo-form" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="column-settings-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-small">
+            <div class="modal-header">
+                <h2>Column Settings</h2>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="column-settings">
+                    <label><input type="checkbox" data-column="title" checked> Title</label>
+                    <label><input type="checkbox" data-column="priority" checked> Priority</label>
+                    <label><input type="checkbox" data-column="due_date" checked> Due Date</label>
+                    <label><input type="checkbox" data-column="tags" checked> Tags</label>
+                    <label><input type="checkbox" data-column="completed" checked> Completed</label>
+                    <label><input type="checkbox" data-column="actions" checked disabled> Actions</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary modal-cancel">Cancel</button>
+                <button class="btn btn-primary" id="save-column-settings">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
