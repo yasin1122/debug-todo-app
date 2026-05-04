@@ -199,6 +199,19 @@ select:focus {
 .todos-table {
     width: 100%;
     border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.todos-table th[data-column="title"] { width: auto; }
+.todos-table th[data-column="priority"] { width: 110px; }
+.todos-table th[data-column="due_date"] { width: 130px; }
+.todos-table th[data-column="completed"] { width: 50px; }
+.todos-table th[data-column="actions"] { width: 90px; }
+
+.todos-table td[data-column="title"] {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .todos-table th,
