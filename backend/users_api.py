@@ -4,7 +4,7 @@ import json
 import hashlib
 import secrets
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 from datetime import datetime, timedelta
 
 import os

@@ -1,121 +1,161 @@
-# Debug Todo App
+# Todo App
 
-A full-stack todo application built specifically for practicing debugging across all layers of a web application. Zero dependencies - uses only Python standard library and vanilla JavaScript.
+A multi-service todo application with authentication, persistent user preferences, and per-user data isolation. Zero external dependencies — Python standard library and vanilla JavaScript only.
 
-## 🚀 Quick Start
+---
 
-```bash
-./start.sh
+## Features
+
+- **Authentication** — session-based login with 24-hour token expiry
+- **Todo management** — create, edit, delete, and toggle completion
+- **Overdue detection** — past-due incomplete todos highlighted in red
+- **Sorting** — by title (case-insensitive), priority, due date, or created date; persists across sessions
+- **Filtering** — all / active / completed / overdue
+- **Column visibility** — show/hide any table column; persists per user
+- **Themes** — light/dark mode; persists per user
+- **Pagination** — configurable 5 / 10 / 20 items per page
+- **Multi-user** — each user sees only their own todos and preferences
+
+---
+
+## Architecture
+
+```
+Browser (port 8000)
+        │
+        ▼
+  Proxy (port 8080)  ◄─── preferences.db
+    │          │
+    ▼          ▼
+Todos API   Users API
+(port 8081) (port 8082)
+    │            │
+ todos.db    users.db
 ```
 
-Then open: http://localhost:8000
+The **proxy** is the single entry point for all API calls from the browser. It handles user preferences directly (reading/writing `preferences.db`) and forwards todo and auth requests to the appropriate backend service.
 
-## 🔑 Demo Accounts
+---
 
-| Username | Password  |
-|----------|-----------|
-| demo     | demo123   |
-| alice    | alice123  |
-| bob      | bob123    |
+## Prerequisites
 
-## 🏗️ Architecture
+- Python 3.8+
 
-### 4-Layer Stack:
-1. **Frontend** (Port 8000)
-   - Pure HTML/CSS/JavaScript
-   - No frameworks or libraries
+---
 
-2. **Proxy Layer** (Port 8080)
-   - Routes requests to backend services
-   - Manages user preferences (theme, sorting, filters)
-   - Handles CORS
+## Setup & Running
 
-3. **Backend APIs**
-   - **Users API** (Port 8082) - Authentication & sessions
-   - **Todos API** (Port 8081) - Todo CRUD operations
+### First run
 
-4. **Databases** (SQLite)
-   - `todos.db` - Todo items and tags
-   - `users.db` - User accounts and sessions
-   - `preferences.db` - User preferences and table settings
+```bash
+# 1. Clone the repository
+git clone https://github.com/yasin1122/debug-todo-app
+cd debug-todo-app
 
-## ✨ Features
+# 2. Initialize the databases (only needed once)
+cd database && python3 init_db.py && cd ..
 
-- **Authentication**: Login/logout with session tokens
-- **Todo Management**: Create, read, update, delete todos
-- **Starring**: Mark important todos
-- **Priority Levels**: Low, Medium, High
-- **Due Dates**: With overdue highlighting
-- **Tags**: Categorize todos
-- **Dark/Light Theme**: Persisted preference
-- **Sorting**: By date, title, priority, starred
-- **Filtering**: All, active, completed, starred, overdue
-- **Pagination**: 5, 10, or 20 items per page
-- **Column Settings**: Show/hide table columns
+# 3. Start all services
+bash run_all.sh
+```
 
-## 🐛 Debugging Practice
+Open **http://localhost:8000** in your browser.
 
-Check `debug/debug_scenarios.md` for 20+ debugging scenarios you can enable:
+### Subsequent runs
 
-- Database performance issues
-- API failures and errors
-- Authentication problems
-- Race conditions
-- CORS issues
-- Security vulnerabilities
-- Memory leaks
-- State synchronization bugs
+```bash
+bash run_all.sh
+```
 
-## 📁 Project Structure
+`run_all.sh` never wipes your data. `start.sh` also preserves existing databases.
+
+### Stopping
+
+Press `Ctrl+C` in the terminal running `run_all.sh`.
+
+---
+
+## Demo Users
+
+| Username | Password |
+|----------|----------|
+| demo     | demo123  |
+| alice    | alice123 |
+| bob      | bob123   |
+
+---
+
+## Service URLs
+
+| Service   | URL                   | Description                       |
+|-----------|-----------------------|-----------------------------------|
+| Frontend  | http://localhost:8000 | Login and todo UI                 |
+| Proxy     | http://localhost:8080 | API gateway + preferences storage |
+| Todos API | http://localhost:8081 | Todo CRUD (internal only)         |
+| Users API | http://localhost:8082 | Authentication (internal only)    |
+
+The frontend talks exclusively to the proxy. The todo and users APIs are internal — never called directly from the browser.
+
+---
+
+## Project Structure
 
 ```
 debug-todo-app/
-├── frontend/          # HTML/CSS/JS files
-├── proxy/            # Proxy server with preferences
-├── backend/          # API servers
-├── database/         # SQLite databases and init script
-├── debug/            # Debug scenarios documentation
-├── start.sh          # Startup script
-└── README.md         # This file
+├── backend/
+│   ├── todos_api.py       # Todo CRUD API — port 8081
+│   └── users_api.py       # Auth API — port 8082
+├── proxy/
+│   └── proxy.py           # Request router + preferences — port 8080
+├── frontend/
+│   ├── index.html         # Main app page
+│   ├── login.html         # Login page
+│   ├── app.js             # All frontend logic
+│   └── style.css          # Styles (light + dark theme)
+├── database/
+│   ├── init_db.py         # One-time database initializer
+│   ├── todos.db           # Todo data (git-ignored, auto-created)
+│   ├── users.db           # User accounts + sessions (git-ignored)
+│   └── preferences.db     # Per-user settings (git-ignored)
+├── debug/
+│   └── debug_scenarios.md # Debugging practice scenarios
+├── run_all.sh             # Start all services (preserves data)
+└── start.sh               # Start all services (checks for existing DBs)
 ```
 
-## 🛠️ Manual Service Start
+---
 
-If you prefer to start services individually:
+## API Quick Reference
 
-```bash
-# Initialize databases
-cd database && python3 init_db.py
+All requests go through the proxy at `http://localhost:8080`.
 
-# Start each service in separate terminals:
-cd backend && python3 users_api.py      # Port 8082
-cd backend && python3 todos_api.py      # Port 8081
-cd proxy && python3 proxy.py            # Port 8080
-cd frontend && python3 -m http.server 8000
-```
+| Method | Path                    | Header required | Description               |
+|--------|-------------------------|-----------------|---------------------------|
+| POST   | /api/auth/login         | —               | Login, returns token      |
+| POST   | /api/auth/logout        | —               | Invalidate session        |
+| POST   | /api/auth/verify        | —               | Validate a token          |
+| GET    | /api/todos              | X-User-Id       | List todos (with filters) |
+| POST   | /api/todos              | X-User-Id       | Create todo               |
+| PUT    | /api/todos/:id          | X-User-Id       | Update todo fields        |
+| PUT    | /api/todos/:id/complete | X-User-Id       | Toggle completion         |
+| DELETE | /api/todos/:id          | X-User-Id       | Delete todo               |
+| GET    | /preferences            | X-User-Id       | Load user preferences     |
+| POST   | /preferences            | X-User-Id       | Save user preferences     |
 
-## 🎯 Learning Objectives
+The `X-User-Id` value is returned by the login endpoint.
 
-This app helps you practice debugging:
-- Frontend → Backend communication
-- Authentication and session management
-- Database queries and performance
-- State synchronization
-- Error handling
-- Security vulnerabilities
-- Performance optimization
+---
 
-## 🔍 Debugging Tips
+## Debugging Practice
 
-1. **Browser DevTools**: Network tab, Console, Application storage
-2. **Python debugging**: Add print statements or use `pdb`
-3. **Database inspection**: `sqlite3 database/todos.db`
-4. **Network monitoring**: `curl` commands to test APIs
-5. **Process monitoring**: `ps aux | grep python`
+`debug/debug_scenarios.md` documents 20+ injectable debug scenarios covering:
 
-## 📝 Notes
-
-- This app intentionally uses NO external dependencies
-- All features work correctly by default
-- Debug scenarios must be manually enabled
-- Perfect for learning debugging without framework complexity
+- Slow database queries
+- Random API failures
+- CORS issues
+- Fast token expiry
+- Race conditions in preference loading
+- SQL injection points
+- XSS vulnerabilities
+- Memory leaks
+- N+1 query problems

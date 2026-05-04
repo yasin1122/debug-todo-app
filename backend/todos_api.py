@@ -3,7 +3,6 @@ import sqlite3
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from datetime import datetime
 
 import os
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'todos.db')
@@ -69,11 +68,11 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         valid_sort_fields = ['created_at', 'title', 'priority', 'due_date']
         if sort_by in valid_sort_fields:
             if sort_by == 'priority':
-                base_query += f" ORDER BY CASE t.priority WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3 END {sort_order.upper()}"
+                base_query += f" ORDER BY CASE priority WHEN 'low' THEN 1 WHEN 'medium' THEN 2 WHEN 'high' THEN 3 END {sort_order.upper()}"
             elif sort_by == 'title':
-                base_query += f' ORDER BY t.title COLLATE NOCASE {sort_order.upper()}'
+                base_query += f' ORDER BY title COLLATE NOCASE {sort_order.upper()}'
             else:
-                base_query += f' ORDER BY t.{sort_by} {sort_order.upper()}'
+                base_query += f' ORDER BY {sort_by} {sort_order.upper()}'
 
         cursor.execute(base_query, params)
         todos = [dict(row) for row in cursor.fetchall()]

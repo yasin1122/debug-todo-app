@@ -3,7 +3,7 @@ import sqlite3
 import json
 import http.client
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 import os
 PREFERENCES_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'preferences.db')
@@ -219,7 +219,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def get_default_table_settings(self):
         return {
-            'visible_columns': ["title", "priority", "due_date", "tags", "completed", "actions"],
+            'visible_columns': ["title", "priority", "due_date", "completed", "actions"],
             'column_widths': {},
             'last_filter': None
         }
@@ -228,12 +228,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
 
-        path = self.path  # Keep the full path including /api
-
-        headers = {}
-        for key, value in self.headers.items():
-            headers[key] = value
-
+        path = self.path
+        headers = dict(self.headers.items())
         status, response = self.proxy_request(TODOS_API, method, path, headers, body)
 
         self.send_response(status)
@@ -246,12 +242,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', 0))
         body = self.rfile.read(content_length) if content_length > 0 else None
 
-        path = self.path  # Keep the full path including /api
-
-        headers = {}
-        for key, value in self.headers.items():
-            headers[key] = value
-
+        path = self.path
+        headers = dict(self.headers.items())
         status, response = self.proxy_request(USERS_API, method, path, headers, body)
 
         self.send_response(status)

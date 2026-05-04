@@ -113,7 +113,6 @@ function renderTodos() {
     const emptyState = document.getElementById('empty-state');
     const itemsPerPage = parseInt(document.getElementById('items-per-page').value);
 
-    // Update sort indicators on headers
     updateSortIndicators();
 
     if (filteredTodos.length === 0) {
@@ -240,14 +239,6 @@ function showModal(modalId) {
 
 function hideModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
-}
-
-function showLoading() {
-    document.getElementById('loading-overlay').style.display = 'flex';
-}
-
-function hideLoading() {
-    document.getElementById('loading-overlay').style.display = 'none';
 }
 
 function escapeHtml(text) {

@@ -2,7 +2,6 @@
 import sqlite3
 import hashlib
 import os
-from datetime import datetime
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -105,7 +104,7 @@ def init_preferences_db():
     cursor.execute('''
         CREATE TABLE table_settings (
             user_id INTEGER PRIMARY KEY,
-            visible_columns TEXT DEFAULT '["title","priority","due_date","tags","completed","actions"]',
+            visible_columns TEXT DEFAULT '["title","priority","due_date","completed","actions"]',
             column_widths TEXT DEFAULT '{}',
             last_filter TEXT
         )
