@@ -187,7 +187,7 @@ function applyColumnSettings() {
         ? JSON.parse(tableSettings.visible_columns)
         : tableSettings.visible_columns;
 
-    document.querySelectorAll('[data-column]').forEach(el => {
+    document.querySelectorAll('#todos-table [data-column]').forEach(el => {
         const column = el.getAttribute('data-column');
         el.style.display = visibleColumns.includes(column) || column === 'actions' ? '' : 'none';
     });
