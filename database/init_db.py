@@ -128,7 +128,7 @@ def init_preferences_db():
         CREATE TABLE user_preferences (
             user_id       INTEGER PRIMARY KEY,
             theme         TEXT DEFAULT 'light' CHECK(theme IN ('light', 'dark')),
-            sort_by       TEXT DEFAULT 'created_at' CHECK(sort_by IN ('created_at', 'title', 'priority', 'due_date')),
+            sort_by       TEXT DEFAULT 'created_at' CHECK(sort_by IN ('created_at', 'title', 'priority', 'due_date', 'completed')),
             sort_order    TEXT DEFAULT 'desc' CHECK(sort_order IN ('asc', 'desc')),
             filter_status TEXT DEFAULT 'all' CHECK(filter_status IN ('all', 'active', 'completed', 'overdue')),
             show_completed BOOLEAN DEFAULT 1,

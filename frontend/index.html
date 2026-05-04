@@ -78,6 +78,7 @@
                             <option value="title">Title</option>
                             <option value="priority">Priority</option>
                             <option value="due_date">Due Date</option>
+                            <option value="completed">Completed</option>
                         </select>
                         <select id="sort-order">
                             <option value="desc">↓</option>
@@ -116,9 +117,10 @@
                             <th data-column="title" class="sortable">Title</th>
                             <th data-column="priority" class="sortable">Priority</th>
                             <th data-column="due_date" class="sortable">Due Date</th>
-                            <!-- The completed column is not sortable — clicking it would
-                                 be confusing since you toggle completion per row. -->
-                            <th data-column="completed">✓</th>
+                            <!-- Click the header to sort by completion (incomplete first / last
+                                 depending on direction). The button inside each row's cell still
+                                 toggles completion on a per-row basis. -->
+                            <th data-column="completed" class="sortable">✓</th>
                             <th data-column="actions">Actions</th>
                         </tr>
                     </thead>

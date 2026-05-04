@@ -102,7 +102,11 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         # Apply sorting. We whitelist valid column names to prevent SQL injection.
         sort_by = query_params.get('sort_by', ['created_at'])[0]
         sort_order = query_params.get('sort_order', ['desc'])[0]
-        valid_sort_fields = ['created_at', 'title', 'priority', 'due_date']
+        # The frontend uses 'completed' as the column key for the ✓ column, but
+        # the database column is named 'is_completed'. Translate before lookup.
+        if sort_by == 'completed':
+            sort_by = 'is_completed'
+        valid_sort_fields = ['created_at', 'title', 'priority', 'due_date', 'is_completed']
 
         if sort_by in valid_sort_fields:
             if sort_by == 'priority':
