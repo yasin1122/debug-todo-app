@@ -276,15 +276,6 @@ select:focus {
     color: var(--success-color);
 }
 
-.tag {
-    display: inline-block;
-    padding: 0.2rem 0.5rem;
-    background-color: var(--bg-tertiary);
-    border-radius: 12px;
-    font-size: 12px;
-    margin-right: 0.25rem;
-}
-
 .todo-complete {
     background: none;
     border: none;
@@ -421,31 +412,6 @@ select:focus {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
-}
-
-.tags-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.tag-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.tag-checkbox:hover {
-    background-color: var(--bg-tertiary);
-}
-
-.tag-checkbox input[type="checkbox"] {
-    width: auto;
 }
 
 .column-settings {

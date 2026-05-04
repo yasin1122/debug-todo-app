@@ -40,8 +40,6 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
             elif len(path_parts) == 4:
                 todo_id = path_parts[3]
                 self.handle_get_todo(todo_id)
-        elif len(path_parts) >= 3 and path_parts[2] == 'tags':
-            self.handle_get_tags()
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
@@ -55,23 +53,16 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        base_query = '''
-            SELECT t.*, GROUP_CONCAT(tg.tag_id) as tag_ids
-            FROM todos t
-            LEFT JOIN todo_tags tg ON t.id = tg.todo_id
-            WHERE t.user_id = ?
-        '''
+        base_query = 'SELECT * FROM todos WHERE user_id = ?'
         params = [user_id]
 
         status_filter = query_params.get('status', ['all'])[0]
         if status_filter == 'active':
-            base_query += ' AND t.is_completed = 0'
+            base_query += ' AND is_completed = 0'
         elif status_filter == 'completed':
-            base_query += ' AND t.is_completed = 1'
+            base_query += ' AND is_completed = 1'
         elif status_filter == 'overdue':
-            base_query += " AND t.due_date < datetime('now') AND t.is_completed = 0"
-
-        base_query += ' GROUP BY t.id'
+            base_query += " AND due_date < datetime('now') AND is_completed = 0"
 
         sort_by = query_params.get('sort_by', ['created_at'])[0]
         sort_order = query_params.get('sort_order', ['desc'])[0]
@@ -86,14 +77,6 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
 
         cursor.execute(base_query, params)
         todos = [dict(row) for row in cursor.fetchall()]
-
-        for todo in todos:
-            if todo['tag_ids']:
-                todo['tags'] = [int(tid) for tid in todo['tag_ids'].split(',')]
-            else:
-                todo['tags'] = []
-            del todo['tag_ids']
-
         conn.close()
         self.send_json_response(todos)
 
@@ -107,14 +90,7 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
 
-        cursor.execute('''
-            SELECT t.*, GROUP_CONCAT(tg.tag_id) as tag_ids
-            FROM todos t
-            LEFT JOIN todo_tags tg ON t.id = tg.todo_id
-            WHERE t.id = ? AND t.user_id = ?
-            GROUP BY t.id
-        ''', (todo_id, user_id))
-
+        cursor.execute('SELECT * FROM todos WHERE id = ? AND user_id = ?', (todo_id, user_id))
         todo = cursor.fetchone()
         conn.close()
 
@@ -122,23 +98,7 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
             self.send_json_response({'error': 'Todo not found'}, 404)
             return
 
-        todo_dict = dict(todo)
-        if todo_dict['tag_ids']:
-            todo_dict['tags'] = [int(tid) for tid in todo_dict['tag_ids'].split(',')]
-        else:
-            todo_dict['tags'] = []
-        del todo_dict['tag_ids']
-
-        self.send_json_response(todo_dict)
-
-    def handle_get_tags(self):
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute('SELECT * FROM tags')
-        tags = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        self.send_json_response(tags)
+        self.send_json_response(dict(todo))
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -146,8 +106,6 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
 
         if len(path_parts) >= 3 and path_parts[2] == 'todos':
             self.handle_create_todo()
-        elif len(path_parts) >= 3 and path_parts[2] == 'tags':
-            self.handle_create_tag()
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
@@ -181,39 +139,10 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         ))
 
         todo_id = cursor.lastrowid
-
-        tags = data.get('tags', [])
-        for tag_id in tags:
-            cursor.execute('INSERT INTO todo_tags (todo_id, tag_id) VALUES (?, ?)', (todo_id, tag_id))
-
         conn.commit()
         conn.close()
 
         self.send_json_response({'id': todo_id, 'message': 'Todo created successfully'}, 201)
-
-    def handle_create_tag(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        body = self.rfile.read(content_length)
-        data = json.loads(body.decode())
-
-        name = data.get('name')
-        if not name:
-            self.send_json_response({'error': 'Tag name is required'}, 400)
-            return
-
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-
-        try:
-            cursor.execute('INSERT INTO tags (name, color) VALUES (?, ?)',
-                         (name, data.get('color', '#808080')))
-            tag_id = cursor.lastrowid
-            conn.commit()
-            conn.close()
-            self.send_json_response({'id': tag_id, 'message': 'Tag created successfully'}, 201)
-        except sqlite3.IntegrityError:
-            conn.close()
-            self.send_json_response({'error': 'Tag already exists'}, 400)
 
     def do_PUT(self):
         parsed = urlparse(self.path)
@@ -277,11 +206,6 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
             UPDATE todos SET {', '.join(update_fields)}
             WHERE id = ? AND user_id = ?
         ''', params)
-
-        if 'tags' in data:
-            cursor.execute('DELETE FROM todo_tags WHERE todo_id = ?', (todo_id,))
-            for tag_id in data['tags']:
-                cursor.execute('INSERT INTO todo_tags (todo_id, tag_id) VALUES (?, ?)', (todo_id, tag_id))
 
         conn.commit()
         conn.close()

@@ -2,7 +2,6 @@ const API_URL = 'http://localhost:8080';
 let currentUser = null;
 let allTodos = [];
 let filteredTodos = [];
-let allTags = [];
 let currentPage = 1;
 let userPreferences = null;
 let tableSettings = null;
@@ -83,14 +82,6 @@ async function savePreferences(updates) {
     });
 }
 
-async function loadTags() {
-    const response = await fetch(`${API_URL}/api/tags`);
-    if (response.ok) {
-        allTags = await response.json();
-        renderTagsInModal();
-    }
-}
-
 async function loadTodos() {
     const sortBy = document.getElementById('sort-by').value;
     const sortOrder = document.getElementById('sort-order').value;
@@ -143,11 +134,6 @@ function renderTodos() {
         const isOverdue = todo.due_date && new Date(todo.due_date) < new Date() && todo.is_completed !== 1;
         const formattedDate = todo.due_date ? new Date(todo.due_date).toLocaleDateString() : '-';
 
-        const todoTags = todo.tags ? todo.tags.map(tagId => {
-            const tag = allTags.find(t => t.id === tagId);
-            return tag ? `<span class="tag">${tag.name}</span>` : '';
-        }).join('') : '';
-
         return `
             <tr data-todo-id="${todo.id}">
                 <td data-column="title">${escapeHtml(todo.title)}</td>
@@ -155,7 +141,6 @@ function renderTodos() {
                     <span class="priority-${todo.priority}">${capitalizeFirst(todo.priority)}</span>
                 </td>
                 <td data-column="due_date" class="${isOverdue ? 'overdue' : ''}">${formattedDate}</td>
-                <td data-column="tags">${todoTags}</td>
                 <td data-column="completed">
                     <button class="todo-complete ${todo.is_completed === 1 ? 'completed' : ''}" onclick="toggleComplete(${todo.id})">
                         ${todo.is_completed === 1 ? '✓' : '○'}
@@ -208,16 +193,6 @@ function applyColumnSettings() {
     });
 }
 
-function renderTagsInModal() {
-    const container = document.getElementById('tags-container');
-    container.innerHTML = allTags.map(tag => `
-        <label class="tag-checkbox">
-            <input type="checkbox" value="${tag.id}" name="tags">
-            <span>${tag.name}</span>
-        </label>
-    `).join('');
-}
-
 async function toggleComplete(todoId) {
     await fetch(`${API_URL}/api/todos/${todoId}/complete`, {
         method: 'PUT',
@@ -256,10 +231,6 @@ async function editTodo(todoId) {
         document.getElementById('todo-due-date').value = localDate.toISOString().slice(0, 16);
     }
 
-    document.querySelectorAll('input[name="tags"]').forEach(checkbox => {
-        checkbox.checked = todo.tags && todo.tags.includes(parseInt(checkbox.value));
-    });
-
     showModal('todo-modal');
 }
 
@@ -293,7 +264,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!await checkAuth()) return;
 
     await loadPreferences();
-    await loadTags();
     await loadTodos();
 
     document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -391,17 +361,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('todo-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        const selectedTags = [];
-        document.querySelectorAll('input[name="tags"]:checked').forEach(checkbox => {
-            selectedTags.push(parseInt(checkbox.value));
-        });
-
         const todoData = {
             title: document.getElementById('todo-title').value,
             description: document.getElementById('todo-description').value,
             priority: document.getElementById('todo-priority').value,
-            due_date: document.getElementById('todo-due-date').value || null,
-            tags: selectedTags
+            due_date: document.getElementById('todo-due-date').value || null
         };
 
         if (editingTodoId) {

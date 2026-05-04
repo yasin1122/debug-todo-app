@@ -29,24 +29,6 @@ def init_todos_db():
         )
     ''')
 
-    cursor.execute('''
-        CREATE TABLE tags (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            color TEXT DEFAULT '#808080'
-        )
-    ''')
-
-    cursor.execute('''
-        CREATE TABLE todo_tags (
-            todo_id INTEGER,
-            tag_id INTEGER,
-            PRIMARY KEY (todo_id, tag_id),
-            FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE,
-            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
-        )
-    ''')
-
     cursor.execute('CREATE INDEX idx_todos_user_id ON todos(user_id)')
     cursor.execute('CREATE INDEX idx_todos_completed ON todos(is_completed)')
 

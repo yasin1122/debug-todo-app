@@ -59,8 +59,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
         elif len(path_parts) >= 3 and path_parts[1] == 'api':
             if path_parts[2] == 'todos':
                 self.proxy_to_todos('GET')
-            elif path_parts[2] == 'tags':
-                self.proxy_to_todos('GET')
             else:
                 self.send_json_response({'error': 'Not found'}, 404)
         else:
@@ -74,8 +72,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self.handle_update_preferences()
         elif len(path_parts) >= 3 and path_parts[1] == 'api':
             if path_parts[2] == 'todos':
-                self.proxy_to_todos('POST')
-            elif path_parts[2] == 'tags':
                 self.proxy_to_todos('POST')
             elif path_parts[2] == 'auth':
                 self.proxy_to_users('POST')
@@ -201,7 +197,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                     VALUES (?, ?, ?, ?)
                 ''', (
                     user_id,
-                    json.dumps(settings.get('visible_columns', ["title","priority","due_date","tags","completed","actions"])),
+                    json.dumps(settings.get('visible_columns', ["title","priority","due_date","completed","actions"])),
                     json.dumps(settings.get('column_widths', {})),
                     settings.get('last_filter')
                 ))
