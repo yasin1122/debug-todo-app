@@ -116,6 +116,7 @@ debug-todo-app/
 │   └── preferences.db     # Per-user settings (git-ignored)
 ├── debug/
 │   └── debug_scenarios.md # Debugging practice scenarios
+├── DESIGN.md              # Deeper docs: request flows, schemas, API reference
 └── run_all.sh             # Start all services (auto-initializes DBs on first run)
 ```
 
@@ -144,14 +145,16 @@ The `X-User-Id` value is returned by the login endpoint.
 
 ## Debugging Practice
 
-`debug/debug_scenarios.md` documents 20+ injectable debug scenarios covering:
+`debug/debug_scenarios.md` is a catalogue of bugs you can deliberately inject
+into the app to practice debugging across all four layers (FE, Proxy, BE, DB).
+Each entry is a copy-paste recipe with exact file, anchor, replacement, and
+revert steps. Categories covered:
 
-- Slow database queries
-- Random API failures
-- CORS issues
-- Fast token expiry
-- Race conditions in preference loading
-- SQL injection points
-- XSS vulnerabilities
-- Memory leaks
-- N+1 query problems
+- **Database & Backend Performance** — slow queries, leaked connections
+- **Backend API Behaviour** — random 500s, fast token expiry, missing validation
+- **Proxy** — broken CORS, header stripping, preference race conditions
+- **Frontend** — state sync, memory leaks, excessive re-renders
+- **Security** — SQL injection, XSS
+
+There is also a **symptom → scenario** lookup table at the bottom of the file
+so you can pick what to debug rather than which layer to break.

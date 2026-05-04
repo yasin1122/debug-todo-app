@@ -299,9 +299,11 @@ async function editTodo(todoId) {
     document.getElementById('todo-priority').value = todo.priority;
 
     if (todo.due_date) {
-        // datetime-local inputs expect the format "YYYY-MM-DDTHH:MM" in local time.
-        // The date from the server is UTC, so we subtract the timezone offset to
-        // convert it to the user's local time before displaying it.
+        // datetime-local inputs expect "YYYY-MM-DDTHH:MM" in local time. The
+        // round-trip is: form value (local-naive string) → DB (stored verbatim) →
+        // FE. JS parses the local-naive ISO string back as local time, but
+        // toISOString() always emits UTC, so we shift by the timezone offset to
+        // produce a string that matches the original local clock value.
         const date = new Date(todo.due_date);
         const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
         document.getElementById('todo-due-date').value = localDate.toISOString().slice(0, 16);
