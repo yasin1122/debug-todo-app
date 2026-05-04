@@ -116,6 +116,7 @@ debug-todo-app/
 │   └── preferences.db     # Per-user settings (git-ignored)
 ├── debug/
 │   └── debug_scenarios.md # Debugging practice scenarios
+├── BUILD_FROM_SCRATCH.md  # Step-by-step tutorial: build this app from zero
 ├── DESIGN.md              # Deeper docs: request flows, schemas, API reference
 └── run_all.sh             # Start all services (auto-initializes DBs on first run)
 ```
@@ -142,6 +143,15 @@ All requests go through the proxy at `http://localhost:8080`.
 The `X-User-Id` value is returned by the login endpoint.
 
 ---
+
+## Learning resources
+
+If you want to build this app from scratch yourself, see
+**[BUILD_FROM_SCRATCH.md](BUILD_FROM_SCRATCH.md)** — a 13-phase, agile-style
+tutorial that takes you from a static HTML page all the way to the four-service
+architecture, with a working app at the end of every phase.
+
+For the design rationale and request flows, see [DESIGN.md](DESIGN.md).
 
 ## Debugging Practice
 
