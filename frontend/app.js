@@ -406,22 +406,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.querySelectorAll('.sortable').forEach(th => {
-        th.addEventListener('click', () => {
+        th.addEventListener('click', async () => {
             const column = th.getAttribute('data-column');
             const currentSort = document.getElementById('sort-by').value;
             const currentOrder = document.getElementById('sort-order').value;
 
+            let newSort = currentSort;
+            let newOrder;
+
             if (currentSort === column) {
-                // If clicking the same column, toggle between desc and asc
-                document.getElementById('sort-order').value = currentOrder === 'desc' ? 'asc' : 'desc';
+                newOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+                document.getElementById('sort-order').value = newOrder;
             } else {
-                // When clicking a new column, always start with desc (down arrow)
-                document.getElementById('sort-by').value = column;
-                document.getElementById('sort-order').value = 'desc';
+                newSort = column;
+                newOrder = 'desc';
+                document.getElementById('sort-by').value = newSort;
+                document.getElementById('sort-order').value = newOrder;
             }
 
             currentPage = 1;
-            loadTodos();
+            await savePreferences({ preferences: { sort_by: newSort, sort_order: newOrder } });
+            await loadTodos();
         });
     });
 });
