@@ -5,12 +5,12 @@
 # "Internal only" means the browser never calls this directly. All requests
 # come through the proxy (port 8080), which adds the user's ID and forwards them.
 
+import os                                   # Build absolute file paths
 import sqlite3                              # Read/write the todos database
 import json                                 # Convert Python dicts to/from JSON text
 from http.server import HTTPServer, BaseHTTPRequestHandler  # Python's built-in web server
 from urllib.parse import urlparse, parse_qs # Split URLs and decode query strings
 
-import os
 # Build an absolute path to todos.db so the script works regardless of which
 # directory you launch it from.
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'todos.db')
@@ -51,22 +51,15 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         return self.headers.get('X-User-Id')
 
     # -------------------------------------------------------------------------
-    # GET  /api/todos        → list all todos (with optional filter/sort)
-    # GET  /api/todos/<id>   → get one specific todo
+    # GET /api/todos  →  list all todos (with optional filter/sort)
     # -------------------------------------------------------------------------
     def do_GET(self):
         parsed = urlparse(self.path)          # Break the URL into parts
-        path_parts = parsed.path.split('/')   # e.g. "/api/todos/5" → ['', 'api', 'todos', '5']
+        path_parts = parsed.path.split('/')   # e.g. "/api/todos" → ['', 'api', 'todos']
         query_params = parse_qs(parsed.query) # e.g. "?status=active" → {'status': ['active']}
 
-        if len(path_parts) >= 3 and path_parts[2] == 'todos':
-            if len(path_parts) == 3:
-                # /api/todos — list all todos
-                self.handle_get_todos(query_params)
-            elif len(path_parts) == 4:
-                # /api/todos/5 — get one todo by ID
-                todo_id = path_parts[3]
-                self.handle_get_todo(todo_id)
+        if len(path_parts) == 3 and path_parts[2] == 'todos':
+            self.handle_get_todos(query_params)
         else:
             self.send_json_response({'error': 'Not found'}, 404)
 
@@ -127,27 +120,6 @@ class TodosAPIHandler(BaseHTTPRequestHandler):
         todos = [dict(row) for row in cursor.fetchall()]
         conn.close()
         self.send_json_response(todos)
-
-    def handle_get_todo(self, todo_id):
-        # Fetch a single todo by ID, but only if it belongs to the requesting user.
-        user_id = self.get_user_id_from_headers()
-        if not user_id:
-            self.send_json_response({'error': 'Unauthorized'}, 401)
-            return
-
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-
-        cursor.execute('SELECT * FROM todos WHERE id = ? AND user_id = ?', (todo_id, user_id))
-        todo = cursor.fetchone()  # Returns one row or None
-        conn.close()
-
-        if not todo:
-            self.send_json_response({'error': 'Todo not found'}, 404)
-            return
-
-        self.send_json_response(dict(todo))
 
     # -------------------------------------------------------------------------
     # POST /api/todos  →  create a new todo

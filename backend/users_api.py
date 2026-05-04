@@ -6,16 +6,15 @@
 # The browser never talks to this service directly. All requests come
 # through the proxy (port 8080), which forwards them here.
 
+import os                                   # Build absolute file paths
 import sqlite3                              # Read/write the users database
 import json                                 # Convert Python dicts to/from JSON text
 import hashlib                              # Hash passwords before comparing them
 import secrets                              # Generate secure random tokens
 from http.server import HTTPServer, BaseHTTPRequestHandler  # Python's built-in web server
 from urllib.parse import urlparse           # Split a URL into its parts (path, query, etc.)
-from datetime import datetime, timedelta   # Work with dates and time math
+from datetime import datetime, timedelta    # Work with dates and time math
 
-
-import os
 # Build the path to users.db relative to this file's location, so the
 # script works no matter which directory you run it from.
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'users.db')

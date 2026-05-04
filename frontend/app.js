@@ -18,8 +18,7 @@ const API_URL = 'http://localhost:8080'; // The single address the browser talks
 // read and update them. Think of them as the app's shared memory.
 
 let currentUser = null;       // The logged-in user: { id, username, token }
-let allTodos = [];            // All todos returned by the last fetch
-let filteredTodos = [];       // The subset of todos after applying the current filter
+let allTodos = [];            // All todos returned by the last fetch (server already filters/sorts)
 let currentPage = 1;          // Which page of results is currently showing
 let userPreferences = null;   // Theme, sort order, filter, items per page, etc.
 let tableSettings = null;     // Which table columns are currently visible
@@ -132,7 +131,7 @@ async function savePreferences(updates) {
 
 async function loadTodos() {
     // Read the current filter/sort values from the dropdowns, send them as
-    // query parameters, and replace allTodos + filteredTodos with the result.
+    // query parameters, and replace allTodos with the result.
     const sortBy = document.getElementById('sort-by').value;
     const sortOrder = document.getElementById('sort-order').value;
     const filterStatus = document.getElementById('filter-status').value;
@@ -149,8 +148,9 @@ async function loadTodos() {
     });
 
     if (response.ok) {
-        allTodos = await response.json(); // Parse the JSON array from the response body
-        filteredTodos = allTodos;         // No client-side filtering — server already filtered
+        // Parse the JSON array from the response body. Server already filtered
+        // and sorted, so allTodos is exactly what we want to display.
+        allTodos = await response.json();
         renderTodos();
     }
 }
@@ -169,7 +169,7 @@ function renderTodos() {
     // Refresh the ↑/↓ sort arrow on the active column header.
     updateSortIndicators();
 
-    if (filteredTodos.length === 0) {
+    if (allTodos.length === 0) {
         // No todos to show — display the empty state message instead.
         tbody.innerHTML = '';
         emptyState.style.display = 'block';
@@ -180,10 +180,10 @@ function renderTodos() {
     emptyState.style.display = 'none';
 
     // Pagination: slice the full array to get only the current page's todos.
-    const totalPages = Math.ceil(filteredTodos.length / itemsPerPage);
+    const totalPages = Math.ceil(allTodos.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    const pageTodos = filteredTodos.slice(startIndex, endIndex);
+    const pageTodos = allTodos.slice(startIndex, endIndex);
 
     // Build one <tr> per todo using a template string, then join them all into
     // one string and set it as the table body's inner HTML.
@@ -433,7 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     document.getElementById('next-page').addEventListener('click', () => {
         const itemsPerPage = parseInt(document.getElementById('items-per-page').value);
-        const totalPages = Math.ceil(filteredTodos.length / itemsPerPage);
+        const totalPages = Math.ceil(allTodos.length / itemsPerPage);
         if (currentPage < totalPages) {
             currentPage++;
             renderTodos();

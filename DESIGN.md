@@ -210,7 +210,6 @@ Browser                    Proxy                Todos API
 │  sort_by      │  TEXT DEFAULT 'created_at'                  │
 │  sort_order   │  TEXT DEFAULT 'desc'   CHECK(IN('asc','desc'))  │
 │  filter_status│  TEXT DEFAULT 'all'                         │
-│  show_completed│ BOOLEAN DEFAULT 1                          │
 │  items_per_page│ INTEGER DEFAULT 10   CHECK(IN(5,10,20))    │
 └───────────────┴─────────────────────────────────────────────┘
 
@@ -219,8 +218,6 @@ Browser                    Proxy                Todos API
 ├─────────────────┬───────────────────────────────────────────┤
 │  user_id        │  INTEGER PRIMARY KEY                      │
 │  visible_columns│  TEXT  (JSON array of column names)       │
-│  column_widths  │  TEXT  (JSON object, reserved)            │
-│  last_filter    │  TEXT  (reserved)                         │
 └─────────────────┴───────────────────────────────────────────┘
 ```
 
@@ -283,7 +280,7 @@ Query parameters:
 | Parameter   | Values                              | Default      |
 |-------------|-------------------------------------|--------------|
 | status      | all / active / completed / overdue  | all          |
-| sort_by     | created_at / title / priority / due_date | created_at |
+| sort_by     | created_at / title / priority / due_date / completed | created_at |
 | sort_order  | asc / desc                          | desc         |
 
 Response `200`: Array of todo objects
@@ -305,6 +302,7 @@ Response `200`: Array of todo objects
 
 Priority sort uses semantic ordering: `low=1 < medium=2 < high=3`.
 Title sort is case-insensitive (`COLLATE NOCASE`).
+The `completed` value is an alias for the DB column `is_completed` and translates to it server-side.
 
 ---
 
@@ -372,14 +370,11 @@ Response `200`:
     "sort_by": "priority",
     "sort_order": "desc",
     "filter_status": "all",
-    "show_completed": 1,
     "items_per_page": 10
   },
   "table_settings": {
     "user_id": 1,
-    "visible_columns": ["title", "priority", "due_date", "completed", "actions"],
-    "column_widths": {},
-    "last_filter": null
+    "visible_columns": ["title", "priority", "due_date", "completed", "actions"]
   }
 }
 ```
@@ -406,15 +401,14 @@ Response `200`: `{ "message": "Preferences updated successfully" }`
 
 ## 6. Frontend Architecture
 
-All client-side logic lives in `app.js` (~420 lines). There is no build step, no framework, no bundler.
+All client-side logic lives in `app.js` (~560 lines). There is no build step, no framework, no bundler.
 
 ### State variables
 
 | Variable        | Type    | Description                                         |
 |-----------------|---------|-----------------------------------------------------|
 | `currentUser`   | object  | `{ id, username, token }` from localStorage         |
-| `allTodos`      | array   | Full list returned by the last `/api/todos` fetch   |
-| `filteredTodos` | array   | Same as `allTodos` (server does all filtering)      |
+| `allTodos`      | array   | Full list returned by the last `/api/todos` fetch (server already filters and sorts) |
 | `currentPage`   | number  | Active pagination page; reset on sort/filter change |
 | `userPreferences`| object | Loaded from proxy on startup                        |
 | `tableSettings` | object  | Column visibility; loaded from proxy on startup     |

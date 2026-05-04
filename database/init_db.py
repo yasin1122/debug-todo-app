@@ -131,7 +131,6 @@ def init_preferences_db():
             sort_by       TEXT DEFAULT 'created_at' CHECK(sort_by IN ('created_at', 'title', 'priority', 'due_date', 'completed')),
             sort_order    TEXT DEFAULT 'desc' CHECK(sort_order IN ('asc', 'desc')),
             filter_status TEXT DEFAULT 'all' CHECK(filter_status IN ('all', 'active', 'completed', 'overdue')),
-            show_completed BOOLEAN DEFAULT 1,
             items_per_page INTEGER DEFAULT 10 CHECK(items_per_page IN (5, 10, 20))
         )
     ''')
@@ -141,9 +140,7 @@ def init_preferences_db():
     cursor.execute('''
         CREATE TABLE table_settings (
             user_id         INTEGER PRIMARY KEY,
-            visible_columns TEXT DEFAULT '["title","priority","due_date","completed","actions"]',
-            column_widths   TEXT DEFAULT '{}',
-            last_filter     TEXT
+            visible_columns TEXT DEFAULT '["title","priority","due_date","completed","actions"]'
         )
     ''')
 

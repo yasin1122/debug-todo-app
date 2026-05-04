@@ -1,278 +1,400 @@
-# Debug Scenarios for Todo App
+# Debug Scenarios
 
-This document contains various debugging scenarios you can enable to practice debugging across all layers of the application.
+This file is a catalogue of bugs you can deliberately inject into the app to
+practice debugging. The codebase ships clean — no scenarios are active by
+default. Each recipe below is **copy-paste ready**: it tells you exactly which
+file to edit, what to add, and how to revert.
 
-## How to Enable Debug Scenarios
+---
 
-Each backend file (users_api.py, todos_api.py, proxy.py) contains commented debug flags at the top. To enable a scenario, uncomment the relevant flag and set it to `True`.
+## How to use
 
-## 1. Database Layer Debugging
+1. Pick a scenario.
+2. Follow the **Steps** exactly — file path, line anchor, and code block.
+3. Restart the affected service (`Ctrl+C` then `bash run_all.sh`). The frontend
+   is static, so a hard browser refresh (`Cmd+Shift+R` / `Ctrl+Shift+R`) is
+   enough for frontend-only changes.
+4. Reproduce the symptom in the browser.
+5. Practice debugging it (DevTools, server logs, the database).
+6. **Revert:** undo the additions. Each scenario tells you what to remove.
 
-### Slow Query Simulation
+> ⚠️ **Don't run these against any data you care about.** Several scenarios
+> introduce real vulnerabilities (SQL injection, XSS) or corrupt state.
+
+---
+
+## Layer 1 · Database & Backend Performance
+
+### 1. Slow database queries
+
+Make every `GET /api/todos` block for 3 seconds.
+
 **File:** `backend/todos_api.py`
+
+**Step 1.** Add to the imports at the top of the file:
 ```python
-# Add at top of file:
-DEBUG_SLOW_DB = True  # Simulates slow database queries
-
-# In handle_get_todos():
-if DEBUG_SLOW_DB:
-    import time
-    time.sleep(3)  # 3 second delay
+import time
 ```
-**What to debug:** Performance issues, loading states, user experience during slow responses
 
-### Missing Index Simulation
+**Step 2.** Inside `handle_get_todos`, immediately after this block:
+```python
+        user_id = self.get_user_id_from_headers()
+        if not user_id:
+            self.send_json_response({'error': 'Unauthorized'}, 401)
+            return
+```
+add:
+```python
+        time.sleep(3)  # DEBUG: simulate slow query
+```
+
+**Symptom:** Loading the todo list hangs for 3 seconds every time.
+**Practice:** Network tab waterfall, loading-state UX, query optimization.
+**Revert:** Delete the `import time` and the `time.sleep(3)` line.
+
+---
+
+### 2. Leaked database connections
+
+Stop closing SQLite connections so they accumulate until SQLite locks up.
+
 **File:** `backend/todos_api.py`
-```python
-# In handle_get_todos(), comment out the index usage:
-# cursor.execute('CREATE INDEX idx_todos_user_id ON todos(user_id)')
-```
-**What to debug:** Slow queries on large datasets, query optimization
 
-### Connection Pool Exhaustion
+**Step 1.** Inside `handle_get_todos`, find the line:
+```python
+        conn.close()
+```
+(near the bottom of the function, after `cursor.fetchall()`) and **delete it**.
+
+**Symptom:** After ~50 page loads you'll start seeing `database is locked` or
+silent stalls. The Python process never releases the file handles.
+
+**Practice:** Resource cleanup, `try/finally`, `with`-statements, connection
+pooling.
+**Revert:** Add the `conn.close()` line back. You may need to kill and restart
+the Todos API to release the leaked connections.
+
+---
+
+## Layer 2 · Backend API Behavior
+
+### 3. Random 500 errors
+
+Make 30% of `GET /api/todos` calls fail.
+
 **File:** `backend/todos_api.py`
+
+**Step 1.** Add to the imports at the top:
 ```python
-DEBUG_LEAK_CONNECTIONS = True
-
-# Don't close connections:
-if not DEBUG_LEAK_CONNECTIONS:
-    conn.close()
+import random
 ```
-**What to debug:** Connection leaks, "database locked" errors
 
-## 2. Backend API Debugging
-
-### Random 500 Errors
-**File:** `backend/todos_api.py`
+**Step 2.** Inside `handle_get_todos`, immediately after the `if not user_id`
+block (same anchor as scenario 1), add:
 ```python
-DEBUG_RANDOM_FAIL = True
-
-# In any handler:
-if DEBUG_RANDOM_FAIL:
-    import random
-    if random.random() < 0.3:  # 30% chance
-        self.send_json_response({'error': 'Random server error'}, 500)
-        return
+        if random.random() < 0.3:  # DEBUG: 30% random failure
+            self.send_json_response({'error': 'Random server error'}, 500)
+            return
 ```
-**What to debug:** Error handling, retry logic, user feedback
 
-### Authentication Token Expiry
+**Symptom:** The list intermittently fails to load. Browser console shows 500s.
+**Practice:** Error handling, retry logic, user-facing error messages.
+**Revert:** Delete the added block and the `import random` if no other scenario uses it.
+
+---
+
+### 4. Fast token expiry
+
+Tokens expire one minute after login instead of 24 hours.
+
 **File:** `backend/users_api.py`
+
+**Step 1.** Inside `handle_login`, find:
 ```python
-DEBUG_FAST_EXPIRE = True
-
-# In handle_login():
-if DEBUG_FAST_EXPIRE:
-    expires_at = datetime.now() + timedelta(minutes=1)  # 1 minute instead of 24 hours
+        expires_at = datetime.now() + timedelta(hours=24)  # Token is valid for 24 hours.
 ```
-**What to debug:** Session management, auto-refresh tokens, logout flows
+**Replace with:**
+```python
+        expires_at = datetime.now() + timedelta(minutes=1)  # DEBUG: fast expiry
+```
 
-### Input Validation Missing
+**Symptom:** Login works, then a minute later every action redirects to login.
+**Practice:** Session lifecycle, token refresh, "stay logged in" patterns.
+**Revert:** Restore `timedelta(hours=24)`.
+
+---
+
+### 5. Missing input validation
+
+Accept empty or null titles when creating todos.
+
 **File:** `backend/todos_api.py`
+
+**Step 1.** Inside `handle_create_todo`, find and **delete**:
 ```python
-DEBUG_SKIP_VALIDATION = True
-
-# In handle_create_todo():
-if not DEBUG_SKIP_VALIDATION:
-    if not title:
-        self.send_json_response({'error': 'Title is required'}, 400)
-        return
+        title = data.get('title')
+        if not title:
+            self.send_json_response({'error': 'Title is required'}, 400)
+            return
 ```
-**What to debug:** SQL injection, XSS attacks, data integrity
 
-## 3. Proxy Layer Debugging
+**Step 2.** Replace it with:
+```python
+        title = data.get('title')  # DEBUG: validation removed
+```
 
-### CORS Issues
+**Symptom:** You can save todos with empty titles. They appear as blank rows.
+**Practice:** Defense-in-depth, input validation, NULL handling in SQL.
+**Revert:** Restore the original 4-line check.
+
+---
+
+## Layer 3 · Proxy
+
+### 6. Broken CORS
+
+The frontend stops being able to talk to the proxy.
+
 **File:** `proxy/proxy.py`
+
+**Step 1.** Inside `send_cors_headers`, find:
 ```python
-DEBUG_CORS_ISSUES = True
-
-# In send_cors_headers():
-if not DEBUG_CORS_ISSUES:
-    self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Origin', '*')
 ```
-**What to debug:** Cross-origin request failures, preflight requests
+and **comment it out**:
+```python
+        # self.send_header('Access-Control-Allow-Origin', '*')  # DEBUG: CORS broken
+```
 
-### Request Header Stripping
+**Symptom:** Every fetch fails. Console shows `CORS policy: No
+'Access-Control-Allow-Origin' header is present`.
+**Practice:** CORS preflight, browser security model, network-tab inspection.
+**Revert:** Uncomment the line.
+
+---
+
+### 7. Random header stripping
+
+Drop the `X-User-Id` header on 30% of forwarded requests.
+
 **File:** `proxy/proxy.py`
+
+**Step 1.** Add to the imports at the top:
 ```python
-DEBUG_STRIP_HEADERS = True
-
-# In proxy_request():
-if DEBUG_STRIP_HEADERS:
-    # Remove user ID header randomly
-    if 'X-User-Id' in proxy_headers and random.random() < 0.3:
-        del proxy_headers['X-User-Id']
+import random
 ```
-**What to debug:** Authentication failures, missing context
 
-### Preference Race Conditions
+**Step 2.** Inside `proxy_request`, find:
+```python
+        proxy_headers = {}
+        if headers:
+            for key, value in headers.items():
+                if key.lower() not in ['host', 'connection']:
+                    proxy_headers[key] = value
+```
+and add **immediately after**:
+```python
+        if 'X-User-Id' in proxy_headers and random.random() < 0.3:  # DEBUG
+            del proxy_headers['X-User-Id']
+```
+
+**Symptom:** Random 401 Unauthorized responses despite being logged in.
+**Practice:** Tracing a single request across services, intermittent failures.
+**Revert:** Delete the added block.
+
+---
+
+### 8. Preference race condition
+
+Make `GET /preferences` randomly slow.
+
 **File:** `proxy/proxy.py`
+
+**Step 1.** Add to the imports at the top:
 ```python
-DEBUG_PREF_DELAY = True
-
-# In handle_get_preferences():
-if DEBUG_PREF_DELAY:
-    import time
-    time.sleep(random.uniform(0.5, 2))  # Random delay
+import time
+import random
 ```
-**What to debug:** UI inconsistencies, preference not applying
 
-## 4. Frontend JavaScript Debugging
-
-### State Synchronization Issues
-**File:** `frontend/app.js`
-```javascript
-// Add debug flag:
-const DEBUG_ASYNC_ISSUES = true;
-
-// In loadTodos():
-if (DEBUG_ASYNC_ISSUES) {
-    // Load todos before preferences are ready
-    renderTodos();
-    setTimeout(() => loadPreferences(), 2000);
-}
+**Step 2.** Inside `handle_get_preferences`, immediately after this block:
+```python
+        user_id = self.get_user_id_from_headers()
+        if not user_id:
+            self.send_json_response({'error': 'Unauthorized'}, 401)
+            return
 ```
-**What to debug:** Race conditions, undefined errors
-
-### Double-Click Issues
-**File:** `frontend/app.js`
-```javascript
-// Remove click debouncing:
-const DEBUG_NO_DEBOUNCE = true;
-
-// Allow rapid clicking without protection
+add:
+```python
+        time.sleep(random.uniform(0.5, 2))  # DEBUG: random delay
 ```
-**What to debug:** Duplicate todo creation, multiple API calls
 
-### Memory Leaks
+**Symptom:** On page load, the table renders with default settings, then
+"flashes" to the user's saved theme/sort a moment later.
+**Practice:** Race conditions, render order, blocking vs awaiting.
+**Revert:** Delete the line. Remove the imports if no other scenario uses them.
+
+---
+
+## Layer 4 · Frontend
+
+### 9. State synchronization issue
+
+Render todos before preferences are loaded.
+
 **File:** `frontend/app.js`
-```javascript
-const DEBUG_MEMORY_LEAK = true;
 
-// Keep references to old data:
-if (DEBUG_MEMORY_LEAK) {
-    window.leakedData = window.leakedData || [];
+**Step 1.** Find the `DOMContentLoaded` handler and the lines:
+```javascript
+    await loadPreferences();
+    await loadTodos();
+```
+**Replace with:**
+```javascript
+    loadTodos();                              // DEBUG: not awaited
+    setTimeout(() => loadPreferences(), 2000); // DEBUG: preferences load late
+```
+
+**Symptom:** Page renders, then 2 seconds later columns rearrange / theme flips.
+Possible `Cannot read property of null` errors if a render fires before
+`tableSettings` is set.
+**Practice:** Async ordering, `await`, defensive null checks, loading states.
+**Revert:** Restore the original two `await` calls.
+
+---
+
+### 10. Memory leak
+
+Keep references to every todo list ever fetched.
+
+**File:** `frontend/app.js`
+
+**Step 1.** Inside `renderTodos`, immediately after this line:
+```javascript
+function renderTodos() {
+```
+add:
+```javascript
+    window.leakedData = window.leakedData || [];   // DEBUG: leak
     window.leakedData.push([...allTodos]);
-}
-```
-**What to debug:** Browser memory usage, performance degradation
-
-## 5. Common Real-World Scenarios
-
-### Scenario 1: "My sort preference doesn't persist"
-Enable: `DEBUG_PREF_DELAY` in proxy
-Debug path: Frontend → Proxy → Database → Response timing
-
-### Scenario 2: "Todos disappear randomly"
-Enable: `DEBUG_RANDOM_FAIL` in todos_api
-Debug path: Network tab → Error handling → Retry logic
-
-### Scenario 3: "Can't login after a few minutes"
-Enable: `DEBUG_FAST_EXPIRE` in users_api
-Debug path: Session storage → Token validation → Refresh logic
-
-### Scenario 4: "Page is slow with many todos"
-Enable: `DEBUG_SLOW_DB` in todos_api
-Debug path: SQL queries → Indexes → Pagination → Caching
-
-### Scenario 5: "Dark mode flashes to light on refresh"
-Enable: `DEBUG_PREF_DELAY` in proxy
-Debug path: Initial render → Preference loading → Theme application
-
-## 6. Security Debugging
-
-### SQL Injection Vulnerability
-**File:** `backend/todos_api.py`
-```python
-DEBUG_SQL_INJECTION = True
-
-# In handle_get_todos():
-if DEBUG_SQL_INJECTION:
-    # UNSAFE: Direct string concatenation
-    query = f"SELECT * FROM todos WHERE user_id = {user_id}"
-    cursor.execute(query)  # Vulnerable!
 ```
 
-### XSS Vulnerability
+**Symptom:** Open DevTools → Memory → take heap snapshots; size grows on every
+toggle/sort/filter and never shrinks.
+**Practice:** Heap snapshots, retained references, why DOM listeners and
+globals can leak.
+**Revert:** Delete the added lines.
+
+---
+
+### 11. Excessive re-renders
+
+Re-render the whole table once per second whether data changed or not.
+
 **File:** `frontend/app.js`
-```javascript
-const DEBUG_XSS = true;
 
-// In renderTodos():
-if (DEBUG_XSS) {
-    // UNSAFE: Direct HTML insertion
-    td.innerHTML = todo.title;  // Instead of escapeHtml()
-}
+**Step 1.** At the very bottom of `app.js` (after the closing `});` of the
+`DOMContentLoaded` handler), add:
+```javascript
+setInterval(() => renderTodos(), 1000);  // DEBUG: re-render every second
 ```
 
-## 7. Performance Debugging
+**Symptom:** You can see the table flicker during long sessions; CPU rises.
+**Practice:** Render diffing, profiler timeline, why incremental updates beat
+"redraw everything".
+**Revert:** Delete the line.
 
-### N+1 Query Problem
+---
+
+## Layer 5 · Security
+
+> ⚠️ Both of these introduce real vulnerabilities. Do not deploy a copy of the
+> repo with these enabled.
+
+### 12. SQL injection
+
+String-concatenate `user_id` into the query instead of using `?`.
+
 **File:** `backend/todos_api.py`
+
+**Step 1.** Inside `handle_get_todos`, find:
 ```python
-DEBUG_N_PLUS_ONE = True
-
-# Load tags separately for each todo:
-if DEBUG_N_PLUS_ONE:
-    for todo in todos:
-        cursor.execute('SELECT * FROM todo_tags WHERE todo_id = ?', (todo['id'],))
-        # Separate query for each todo!
+        base_query = 'SELECT * FROM todos WHERE user_id = ?'
+        params = [user_id]
+```
+**Replace with:**
+```python
+        base_query = f'SELECT * FROM todos WHERE user_id = {user_id}'  # DEBUG: VULNERABLE
+        params = []
 ```
 
-### Unnecessary Re-renders
+**Symptom:** Sending `X-User-Id: 1 OR 1=1` returns *every user's* todos.
+**Practice:** Parameterized queries, the difference between binding and
+formatting, why "trusted" headers shouldn't be trusted.
+**Revert:** Restore the original two lines.
+
+---
+
+### 13. XSS
+
+Render todo titles as raw HTML instead of escaping them.
+
 **File:** `frontend/app.js`
-```javascript
-const DEBUG_EXCESSIVE_RENDERS = true;
 
-// Re-render entire table for single changes:
-if (DEBUG_EXCESSIVE_RENDERS) {
-    setInterval(() => renderTodos(), 1000);  // Render every second!
-}
+**Step 1.** Inside `renderTodos`, find:
+```javascript
+                <td data-column="title">${escapeHtml(todo.title)}</td>
+```
+**Replace with:**
+```javascript
+                <td data-column="title">${todo.title}</td>  <!-- DEBUG: VULNERABLE -->
 ```
 
-## Tips for Debugging
+**Symptom:** Create a todo with the title `<img src=x onerror=alert(1)>` —
+it executes when the row renders.
+**Practice:** Escaping vs sanitizing, `textContent` vs `innerHTML`, where
+trust boundaries lie in a frontend.
+**Revert:** Restore `escapeHtml(todo.title)`.
 
-1. **Use Browser DevTools:**
-   - Network tab: Monitor API calls
-   - Console: Check for errors
-   - Application tab: Inspect localStorage
-   - Performance tab: Find bottlenecks
+---
 
-2. **Use Python Debugging:**
-   - Add `print()` statements
-   - Use `import pdb; pdb.set_trace()`
-   - Check SQLite with: `sqlite3 database.db`
+## Where to start — symptom → scenario map
 
-3. **Common Commands:**
-   ```bash
-   # Check if services are running
-   ps aux | grep python
+If you want to practice debugging without picking a layer first, start with one
+of these symptoms and find the matching scenario.
 
-   # Monitor network traffic
-   curl -X GET http://localhost:8080/api/todos -H "X-User-Id: 1"
+| Symptom you observe                              | Inject scenario | Layer  |
+|--------------------------------------------------|-----------------|--------|
+| "Page is slow with many todos."                  | 1               | DB/BE  |
+| "App breaks after a while, can't recover."       | 2               | DB/BE  |
+| "Some todos disappear randomly on refresh."      | 3               | BE     |
+| "Can't log in after a couple of minutes."        | 4               | BE     |
+| "Empty rows appear in the table."                | 5               | BE     |
+| "Whole app stops working in the browser."        | 6               | Proxy  |
+| "Logged in but getting random 401s."             | 7               | Proxy  |
+| "Dark mode flashes to light on every refresh."   | 8               | Proxy  |
+| "UI shows wrong settings on initial load."       | 9               | FE     |
+| "Browser tab gets sluggish over time."           | 10              | FE     |
+| "Battery drains fast / fan spins on this page."  | 11              | FE     |
+| "Suspicious: I can see another user's data."     | 12              | DB/BE  |
+| "Alert popup when I open the table."             | 13              | FE     |
 
-   # Check database
-   sqlite3 database/todos.db "SELECT * FROM todos;"
-   ```
+---
 
-4. **Debugging Order:**
-   - Start with the browser console
-   - Check Network tab for API calls
-   - Review proxy logs
-   - Check backend logs
-   - Examine database state
+## Tips
 
-## Learning Objectives
-
-By working through these scenarios, you'll learn to:
-1. Debug across multiple layers (Frontend → Proxy → Backend → Database)
-2. Use developer tools effectively
-3. Understand common web app issues
-4. Implement proper error handling
-5. Optimize performance
-6. Fix security vulnerabilities
-7. Handle race conditions
-8. Manage state synchronization
-
-Remember: The goal is to understand HOW to debug, not just fix the specific issue. Take time to explore the entire request/response flow!
+- **Network tab** is the best debugger you don't think to open. Status codes
+  and response bodies tell you whether the bug is FE or BE.
+- **`tail -f` the service output** while reproducing — the Python servers print
+  every request.
+- **Inspect the database directly:**
+  ```bash
+  sqlite3 database/todos.db "SELECT id, user_id, is_completed, title FROM todos;"
+  sqlite3 database/preferences.db "SELECT * FROM user_preferences;"
+  sqlite3 database/users.db "SELECT username, last_login FROM users;"
+  ```
+- **Restart the right service.** Python doesn't auto-reload. After editing a
+  `.py` file, kill its process (`lsof -ti:<port> | xargs kill -9`) and run
+  `bash run_all.sh` again. Frontend changes need only a browser hard-refresh.
+- **Debug across layers in order:** Browser console → Network tab → Proxy
+  output → backend output → database. Stop at the first layer that has the
+  wrong data.

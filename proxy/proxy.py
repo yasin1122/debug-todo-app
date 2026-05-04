@@ -9,13 +9,12 @@
 # Having one entry point means the browser only needs to know one address,
 # and we can add auth checks, logging, or rate-limiting in one place.
 
+import os                                   # Build absolute file paths
 import sqlite3                              # Read/write preferences.db
 import json                                 # Convert Python dicts to/from JSON text
 import http.client                          # Make HTTP requests to the backend services
 from http.server import HTTPServer, BaseHTTPRequestHandler  # Python's built-in web server
 from urllib.parse import urlparse           # Break a URL into path, query, etc.
-
-import os
 
 # Absolute path to preferences.db — works regardless of launch directory.
 PREFERENCES_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'database', 'preferences.db')
@@ -200,7 +199,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 # Row exists — UPDATE only the fields that were sent.
                 update_fields = []
                 params = []
-                for field in ['theme', 'sort_by', 'sort_order', 'filter_status', 'show_completed', 'items_per_page']:
+                for field in ['theme', 'sort_by', 'sort_order', 'filter_status', 'items_per_page']:
                     if field in prefs:
                         update_fields.append(f'{field} = ?')
                         params.append(prefs[field])
@@ -214,15 +213,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
             else:
                 # No row yet — INSERT a new one with defaults for missing fields.
                 cursor.execute('''
-                    INSERT INTO user_preferences (user_id, theme, sort_by, sort_order, filter_status, show_completed, items_per_page)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO user_preferences (user_id, theme, sort_by, sort_order, filter_status, items_per_page)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ''', (
                     user_id,
                     prefs.get('theme', 'light'),
                     prefs.get('sort_by', 'created_at'),
                     prefs.get('sort_order', 'desc'),
                     prefs.get('filter_status', 'all'),
-                    prefs.get('show_completed', True),
                     prefs.get('items_per_page', 10)
                 ))
 
@@ -233,32 +231,18 @@ class ProxyHandler(BaseHTTPRequestHandler):
             exists = cursor.fetchone()
 
             if exists:
-                update_fields = []
-                params = []
-                for field in ['visible_columns', 'column_widths', 'last_filter']:
-                    if field in settings:
-                        update_fields.append(f'{field} = ?')
-                        # Lists and dicts must be serialised to a JSON string
-                        # because SQLite only stores text, numbers, or blobs.
-                        value = json.dumps(settings[field]) if isinstance(settings[field], (list, dict)) else settings[field]
-                        params.append(value)
-
-                if update_fields:
-                    params.append(user_id)
-                    cursor.execute(f'''
-                        UPDATE table_settings SET {', '.join(update_fields)}
-                        WHERE user_id = ?
-                    ''', params)
+                if 'visible_columns' in settings:
+                    # visible_columns is a list — serialise to JSON because SQLite
+                    # only stores text, numbers, or blobs.
+                    cursor.execute(
+                        'UPDATE table_settings SET visible_columns = ? WHERE user_id = ?',
+                        (json.dumps(settings['visible_columns']), user_id)
+                    )
             else:
-                cursor.execute('''
-                    INSERT INTO table_settings (user_id, visible_columns, column_widths, last_filter)
-                    VALUES (?, ?, ?, ?)
-                ''', (
-                    user_id,
-                    json.dumps(settings.get('visible_columns', ["title","priority","due_date","completed","actions"])),
-                    json.dumps(settings.get('column_widths', {})),
-                    settings.get('last_filter')
-                ))
+                cursor.execute(
+                    'INSERT INTO table_settings (user_id, visible_columns) VALUES (?, ?)',
+                    (user_id, json.dumps(settings.get('visible_columns', ["title","priority","due_date","completed","actions"])))
+                )
 
         conn.commit()
         conn.close()
@@ -272,16 +256,13 @@ class ProxyHandler(BaseHTTPRequestHandler):
             'sort_by': 'created_at',
             'sort_order': 'desc',
             'filter_status': 'all',
-            'show_completed': True,
             'items_per_page': 10
         }
 
     def get_default_table_settings(self):
         # All columns visible by default for a new user.
         return {
-            'visible_columns': ["title", "priority", "due_date", "completed", "actions"],
-            'column_widths': {},
-            'last_filter': None
+            'visible_columns': ["title", "priority", "due_date", "completed", "actions"]
         }
 
     # -------------------------------------------------------------------------

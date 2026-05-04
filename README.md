@@ -52,10 +52,7 @@ The **proxy** is the single entry point for all API calls from the browser. It h
 git clone https://github.com/yasin1122/debug-todo-app
 cd debug-todo-app
 
-# 2. Initialize the databases (only needed once)
-cd database && python3 init_db.py && cd ..
-
-# 3. Start all services
+# 2. Start all services (initializes databases on first run)
 bash run_all.sh
 ```
 
@@ -67,7 +64,7 @@ Open **http://localhost:8000** in your browser.
 bash run_all.sh
 ```
 
-`run_all.sh` never wipes your data. `start.sh` also preserves existing databases.
+`run_all.sh` only initializes databases the first time — your data is preserved on every subsequent run.
 
 ### Stopping
 
@@ -119,8 +116,7 @@ debug-todo-app/
 │   └── preferences.db     # Per-user settings (git-ignored)
 ├── debug/
 │   └── debug_scenarios.md # Debugging practice scenarios
-├── run_all.sh             # Start all services (preserves data)
-└── start.sh               # Start all services (checks for existing DBs)
+└── run_all.sh             # Start all services (auto-initializes DBs on first run)
 ```
 
 ---
