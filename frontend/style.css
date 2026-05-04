@@ -259,12 +259,14 @@ select:focus {
     table-layout: fixed;
 }
 
-/* Fixed widths for each column. Title gets whatever space is left over. */
-.todos-table th[data-column="title"]     { width: auto; }
-.todos-table th[data-column="priority"]  { width: 110px; }
-.todos-table th[data-column="due_date"]  { width: 130px; }
-.todos-table th[data-column="completed"] { width: 50px; }
-.todos-table th[data-column="actions"]   { width: 90px; }
+/* All columns use percentages summing to 100% so table-layout: fixed
+   gives each column exactly its share — no leftover space that would
+   otherwise pile into the title column. */
+.todos-table th[data-column="title"]     { width: 40%; }
+.todos-table th[data-column="priority"]  { width: 16%; }
+.todos-table th[data-column="due_date"]  { width: 21%; }
+.todos-table th[data-column="completed"] { width: 9%; }
+.todos-table th[data-column="actions"]   { width: 14%; }
 
 /* Long titles are clipped with "…" instead of wrapping and resizing the column. */
 .todos-table td[data-column="title"] {
